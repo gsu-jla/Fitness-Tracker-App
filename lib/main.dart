@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'workout_screen.dart';
 
 void main() {
   runApp(MyApp());
@@ -48,7 +49,14 @@ class HomePage extends StatelessWidget {
       child: ListTile(
         title: Center(child: Text(title)),
         trailing: Icon(icon),
-        onTap: () {},
+        onTap: () {
+          if (title == 'Workouts') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => WorkoutScreen()),
+            );
+          }
+        },
       ),
     );
   }
