@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
+// Screen for tracking daily calorie intake
 class CalorieTrackerScreen extends StatefulWidget {
   @override
   _CalorieTrackerScreenState createState() => _CalorieTrackerScreenState();
 }
 
 class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
+  // Daily calorie goal for the user
   final int _dailyCalorieGoal = 2000;
+  
+  // List of meals with their items and details
   final List<Map<String, dynamic>> _meals = [
     {
       'name': 'Breakfast',
@@ -35,6 +39,7 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
     },
   ];
 
+  // Calculate total calories from all meals
   int get _totalCalories {
     return _meals.expand((meal) => meal['items']).fold(
           0,
@@ -45,18 +50,22 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // App bar with title and purple theme
       appBar: AppBar(
         title: Text('Calorie Tracker'),
         backgroundColor: Colors.purple,
       ),
       body: Column(
         children: [
+          // Calorie summary section at the top
           _buildCalorieSummary(),
+          // Scrollable list of meals
           Expanded(
             child: _buildMealList(),
           ),
         ],
       ),
+      // Floating action button to add new meals
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddMealDialog,
         child: Icon(Icons.add),
@@ -65,6 +74,7 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
     );
   }
 
+  // Build the calorie summary section with progress bar
   Widget _buildCalorieSummary() {
     final progress = _totalCalories / _dailyCalorieGoal;
     return Container(
@@ -72,6 +82,7 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
       color: Colors.purple.withOpacity(0.1),
       child: Column(
         children: [
+          // Display daily goal and remaining calories
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -86,6 +97,7 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
             ],
           ),
           SizedBox(height: 16),
+          // Progress bar showing calorie intake
           LinearProgressIndicator(
             value: progress,
             backgroundColor: Colors.grey[200],
@@ -99,16 +111,19 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
     );
   }
 
+  // Build the list of meals
   Widget _buildMealList() {
     return ListView.builder(
       itemCount: _meals.length,
       itemBuilder: (context, index) {
         final meal = _meals[index];
+        // Calculate total calories for this meal
         final mealCalories = meal['items'].fold(
           0,
           (sum, item) => sum + item['calories'],
         );
 
+        // Create expandable card for each meal
         return Card(
           margin: EdgeInsets.all(8),
           child: ExpansionTile(
@@ -118,11 +133,13 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
             ),
             subtitle: Text('$mealCalories calories'),
             children: [
+              // List of food items in this meal
               ...meal['items'].map<Widget>((item) => ListTile(
                     title: Text(item['name']),
                     subtitle: Text('${item['calories']} calories'),
                     trailing: Text(_formatTime(item['time'])),
                   )),
+              // Add food button for this meal
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Row(
@@ -143,6 +160,7 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
     );
   }
 
+  // Show dialog to add a new meal
   void _showAddMealDialog() {
     showDialog(
       context: context,
@@ -175,6 +193,7 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
     );
   }
 
+  // Show dialog to add food to a specific meal
   void _showAddFoodDialog(Map<String, dynamic> meal) {
     final nameController = TextEditingController();
     final caloriesController = TextEditingController();
@@ -224,6 +243,7 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
     );
   }
 
+  // Format time to HH:MM format
   String _formatTime(DateTime time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }

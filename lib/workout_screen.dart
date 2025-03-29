@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
+// Screen for managing workout routines and exercises
 class WorkoutScreen extends StatefulWidget {
   @override
   _WorkoutScreenState createState() => _WorkoutScreenState();
 }
 
 class _WorkoutScreenState extends State<WorkoutScreen> {
+  // Track the currently selected tab in the bottom navigation
   int _selectedIndex = 0;
+  
+  // List of available workouts with their details
   final List<Map<String, dynamic>> _workouts = [
     {
       'name': 'Push-ups',
@@ -37,11 +41,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     },
   ];
 
+  // List of screens for bottom navigation
   final List<Widget> _screens = [];
 
   @override
   void initState() {
     super.initState();
+    // Initialize the screens for bottom navigation
     _screens.addAll([
       _buildRecentWorkouts(),
       _buildAllWorkouts(),
@@ -49,10 +55,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     ]);
   }
 
+  // Build the Recent Workouts tab
   Widget _buildRecentWorkouts() {
+    // Get the 3 most recent workouts
     final recentWorkouts = _workouts.take(3).toList();
     return Column(
       children: [
+        // Header with title and add button
         Padding(
           padding: const EdgeInsets.all(16.0),
           child: Row(
@@ -71,6 +80,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             ],
           ),
         ),
+        // List of recent workouts
         Expanded(
           child: ListView.builder(
             itemCount: recentWorkouts.length,
@@ -84,9 +94,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
   }
 
+  // Build the All Workouts tab
   Widget _buildAllWorkouts() {
     return Column(
       children: [
+        // Header with title and add button
         Padding(
           padding: const EdgeInsets.all(16.0),
           child: Row(
@@ -105,6 +117,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             ],
           ),
         ),
+        // List of all workouts
         Expanded(
           child: ListView.builder(
             itemCount: _workouts.length,
@@ -117,9 +130,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
   }
 
+  // Build the Workout History tab
   Widget _buildWorkoutHistory() {
     return Column(
       children: [
+        // Header with title
         Padding(
           padding: const EdgeInsets.all(16.0),
           child: Text(
@@ -127,6 +142,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
         ),
+        // List of historical workouts
         Expanded(
           child: ListView.builder(
             itemCount: _workouts.length,
@@ -149,6 +165,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
   }
 
+  // Build a card for displaying workout details
   Widget _buildWorkoutCard(Map<String, dynamic> workout, int index) {
     return Card(
       margin: EdgeInsets.all(8.0),
@@ -161,6 +178,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
         ),
         subtitle: Text('${workout['sets']} sets × ${workout['reps']} reps'),
         children: [
+          // Expanded content with workout details
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -170,6 +188,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 SizedBox(height: 8),
                 Text('Difficulty: ${workout['difficulty']}'),
                 SizedBox(height: 16),
+                // Action buttons
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -205,10 +224,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
-
+  // Show dialog to add a new workout
   void _showAddWorkoutDialog() {
     showDialog(
       context: context,
@@ -223,6 +239,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
   }
 
+  // Show dialog to edit an existing workout
   void _showEditWorkoutDialog(Map<String, dynamic> workout, int index) {
     showDialog(
       context: context,
@@ -238,14 +255,22 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     );
   }
 
+  // Format date to DD/MM/YYYY format
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // App bar with title and purple theme
       appBar: AppBar(
         title: Text('Workouts'),
         backgroundColor: Colors.purple,
       ),
+      // Main content area showing the selected tab
       body: _screens[_selectedIndex],
+      // Bottom navigation bar for switching between tabs
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
@@ -274,6 +299,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   }
 }
 
+// Dialog for adding or editing workouts
 class _WorkoutDialog extends StatefulWidget {
   final Map<String, dynamic>? workout;
   final Function(Map<String, dynamic>) onSave;
@@ -289,6 +315,7 @@ class _WorkoutDialog extends StatefulWidget {
 }
 
 class _WorkoutDialogState extends State<_WorkoutDialog> {
+  // Controllers for form fields
   late TextEditingController _nameController;
   late TextEditingController _setsController;
   late TextEditingController _repsController;
@@ -298,6 +325,7 @@ class _WorkoutDialogState extends State<_WorkoutDialog> {
   @override
   void initState() {
     super.initState();
+    // Initialize controllers with existing workout data or defaults
     _nameController = TextEditingController(text: widget.workout?['name'] ?? '');
     _setsController = TextEditingController(text: widget.workout?['sets']?.toString() ?? '');
     _repsController = TextEditingController(text: widget.workout?['reps']?.toString() ?? '');
@@ -313,6 +341,7 @@ class _WorkoutDialogState extends State<_WorkoutDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Form fields for workout details
             TextField(
               controller: _nameController,
               decoration: InputDecoration(labelText: 'Workout Name'),
@@ -333,6 +362,7 @@ class _WorkoutDialogState extends State<_WorkoutDialog> {
               maxLines: 3,
             ),
             SizedBox(height: 16),
+            // Difficulty dropdown
             DropdownButtonFormField<String>(
               value: _difficulty,
               decoration: InputDecoration(labelText: 'Difficulty'),
@@ -355,6 +385,7 @@ class _WorkoutDialogState extends State<_WorkoutDialog> {
         ),
       ),
       actions: [
+        // Cancel and Save buttons
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: Text('Cancel'),

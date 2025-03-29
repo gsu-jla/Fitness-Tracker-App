@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+// Screen for logging completed workouts
 class WorkoutLogScreen extends StatefulWidget {
   @override
   _WorkoutLogScreenState createState() => _WorkoutLogScreenState();
 }
 
 class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
+  // List of logged workouts with their details
   final List<Map<String, dynamic>> _workoutLogs = [
     {
       'date': DateTime.now().subtract(Duration(days: 1)),
@@ -32,18 +34,22 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // App bar with title and purple theme
       appBar: AppBar(
         title: Text('Workout Log'),
         backgroundColor: Colors.purple,
       ),
       body: Column(
         children: [
+          // Quick log section at the top
           _buildQuickLogSection(),
+          // Scrollable list of logged workouts
           Expanded(
             child: _buildWorkoutLogList(),
           ),
         ],
       ),
+      // Floating action button to add new logs
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddLogDialog,
         child: Icon(Icons.add),
@@ -52,6 +58,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     );
   }
 
+  // Build the quick log section with common workout buttons
   Widget _buildQuickLogSection() {
     return Container(
       padding: EdgeInsets.all(16),
@@ -64,6 +71,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           SizedBox(height: 16),
+          // Row of quick log buttons
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -89,6 +97,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     );
   }
 
+  // Build a quick log button with custom color
   Widget _buildQuickLogButton(String name, IconData icon, Color color) {
     return ElevatedButton.icon(
       onPressed: () => _showQuickLogDialog(name),
@@ -101,6 +110,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     );
   }
 
+  // Build the list of logged workouts
   Widget _buildWorkoutLogList() {
     return ListView.builder(
       itemCount: _workoutLogs.length,
@@ -109,6 +119,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
         return Card(
           margin: EdgeInsets.all(8),
           child: ListTile(
+            // Status indicator
             leading: CircleAvatar(
               backgroundColor: log['completed'] ? Colors.green : Colors.grey,
               child: Icon(
@@ -116,6 +127,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
                 color: Colors.white,
               ),
             ),
+            // Workout details
             title: Text(log['workoutName']),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -133,6 +145,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     );
   }
 
+  // Show dialog for quick logging a workout
   void _showQuickLogDialog(String workoutName) {
     showDialog(
       context: context,
@@ -148,6 +161,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     );
   }
 
+  // Show dialog to add a new workout log
   void _showAddLogDialog() {
     showDialog(
       context: context,
@@ -162,6 +176,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     );
   }
 
+  // Show dialog to edit an existing workout log
   void _showEditLogDialog(Map<String, dynamic> log, int index) {
     showDialog(
       context: context,
@@ -177,11 +192,13 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     );
   }
 
+  // Format date to DD/MM/YYYY format
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
 }
 
+// Dialog for adding or editing workout logs
 class _WorkoutLogDialog extends StatefulWidget {
   final Map<String, dynamic>? log;
   final String? workoutName;
@@ -199,6 +216,7 @@ class _WorkoutLogDialog extends StatefulWidget {
 }
 
 class _WorkoutLogDialogState extends State<_WorkoutLogDialog> {
+  // Controllers for form fields
   late TextEditingController _nameController;
   late TextEditingController _setsController;
   late TextEditingController _repsController;
@@ -209,6 +227,7 @@ class _WorkoutLogDialogState extends State<_WorkoutLogDialog> {
   @override
   void initState() {
     super.initState();
+    // Initialize controllers with existing log data or defaults
     _nameController = TextEditingController(text: widget.log?['workoutName'] ?? widget.workoutName ?? '');
     _setsController = TextEditingController(text: widget.log?['sets']?.toString() ?? '');
     _repsController = TextEditingController(text: widget.log?['reps']?.toString() ?? '');
@@ -225,6 +244,7 @@ class _WorkoutLogDialogState extends State<_WorkoutLogDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Form fields for workout details
             TextField(
               controller: _nameController,
               decoration: InputDecoration(labelText: 'Workout Name'),
@@ -245,6 +265,7 @@ class _WorkoutLogDialogState extends State<_WorkoutLogDialog> {
               maxLines: 3,
             ),
             SizedBox(height: 16),
+            // Duration dropdown
             Row(
               children: [
                 Text('Duration: '),
@@ -274,6 +295,7 @@ class _WorkoutLogDialogState extends State<_WorkoutLogDialog> {
                 ),
               ],
             ),
+            // Completion status toggle
             SwitchListTile(
               title: Text('Completed'),
               value: _completed,
@@ -287,6 +309,7 @@ class _WorkoutLogDialogState extends State<_WorkoutLogDialog> {
         ),
       ),
       actions: [
+        // Cancel and Save buttons
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: Text('Cancel'),

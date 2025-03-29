@@ -1,34 +1,41 @@
+// Import required Flutter material package and custom screens
 import 'package:flutter/material.dart';
 import 'workout_screen.dart';
 import 'workout_log_screen.dart';
 import 'calorie_tracker_screen.dart';
 
+// Main entry point of the application
 void main() {
   runApp(MyApp());
 }
 
+// Root widget of the application
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: HomePage(),
+      home: HomePage(), // Set HomePage as the initial screen
     );
   }
 }
 
+// Home page widget that displays the main navigation menu
 class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // App bar with title and purple background
       appBar: AppBar(
         title: Text('Home'),
         backgroundColor: Colors.purple,
       ),
+      // Main content area with navigation buttons
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // Navigation buttons for different features
             buildButton(context, 'Workout Log', Icons.event_note),
             SizedBox(height: 16),
             buildButton(context, 'Calorie Tracker', Icons.event_note),
@@ -42,8 +49,10 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  // Helper method to create consistent navigation buttons
   Widget buildButton(BuildContext context, String title, IconData icon) {
     return Container(
+      // Button styling with rounded corners and border
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.black, width: 3),
@@ -51,6 +60,7 @@ class HomePage extends StatelessWidget {
       child: ListTile(
         title: Center(child: Text(title)),
         trailing: Icon(icon),
+        // Navigation logic based on button title
         onTap: () {
           if (title == 'Workouts') {
             Navigator.push(
