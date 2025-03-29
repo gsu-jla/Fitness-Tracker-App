@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'workout_screen.dart';
+import 'workout_log_screen.dart';
 
 void main() {
   runApp(MyApp());
@@ -54,6 +55,11 @@ class HomePage extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => WorkoutScreen()),
+            );
+          } else if (title == 'Workout Log') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => WorkoutLogScreen()),
             );
           }
         },
