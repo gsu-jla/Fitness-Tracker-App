@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'workout_screen.dart';
 import 'workout_log_screen.dart';
+import 'calorie_tracker_screen.dart';
 
 void main() {
   runApp(MyApp());
@@ -60,6 +61,11 @@ class HomePage extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => WorkoutLogScreen()),
+            );
+          } else if (title == 'Calorie Tracker') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => CalorieTrackerScreen()),
             );
           }
         },
