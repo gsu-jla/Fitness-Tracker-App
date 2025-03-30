@@ -9,7 +9,6 @@ class PresetRoutinesScreen extends StatefulWidget {
 }
 
 class _PresetRoutinesScreenState extends State<PresetRoutinesScreen> {
-  // Sample preset routines data
   final List<Map<String, dynamic>> _routines = [
     {
       'name': 'Beginner Full Body',
@@ -22,50 +21,23 @@ class _PresetRoutinesScreenState extends State<PresetRoutinesScreen> {
       ],
     },
     {
-      'name': 'Intermediate Strength',
-      'level': 'Intermediate',
-      'exercises': [
-        {'name': 'Bench Press', 'sets': 4, 'reps': '8-10', 'rest': '90s'},
-        {'name': 'Deadlifts', 'sets': 4, 'reps': '6-8', 'rest': '90s'},
-        {'name': 'Pull-ups', 'sets': 4, 'reps': '6-8', 'rest': '90s'},
-        {'name': 'Squats', 'sets': 4, 'reps': '8-10', 'rest': '90s'},
-      ],
-    },
-    {
-      'name': 'Advanced Power',
-      'level': 'Advanced',
-      'exercises': [
-        {'name': 'Power Cleans', 'sets': 5, 'reps': '5', 'rest': '120s'},
-        {'name': 'Weighted Pull-ups', 'sets': 5, 'reps': '6-8', 'rest': '120s'},
-        {'name': 'Front Squats', 'sets': 5, 'reps': '5', 'rest': '120s'},
-        {'name': 'Overhead Press', 'sets': 5, 'reps': '5', 'rest': '120s'},
-      ],
-    },
-    {
-      'name': 'Beginner Cardio',
+      'name': 'Core Strength',
       'level': 'Beginner',
       'exercises': [
-        {'name': 'Walking', 'duration': '20min', 'intensity': 'Moderate'},
-        {'name': 'Light Jogging', 'duration': '10min', 'intensity': 'Low'},
-        {'name': 'Jump Rope', 'duration': '5min', 'intensity': 'Low'},
+        {'name': 'Crunches', 'sets': 3, 'reps': '15', 'rest': '45s'},
+        {'name': 'Plank', 'sets': 3, 'duration': '30s', 'rest': '45s'},
+        {'name': 'Russian Twists', 'sets': 3, 'reps': '20', 'rest': '45s'},
+        {'name': 'Mountain Climbers', 'sets': 3, 'duration': '30s', 'rest': '45s'},
       ],
     },
     {
-      'name': 'Intermediate HIIT',
+      'name': 'Upper Body Focus',
       'level': 'Intermediate',
       'exercises': [
-        {'name': 'Sprint Intervals', 'sets': 8, 'work': '30s', 'rest': '60s'},
-        {'name': 'Burpees', 'sets': 5, 'reps': '10', 'rest': '60s'},
-        {'name': 'Mountain Climbers', 'sets': 5, 'duration': '45s', 'rest': '60s'},
-      ],
-    },
-    {
-      'name': 'Advanced Endurance',
-      'level': 'Advanced',
-      'exercises': [
-        {'name': 'Long Distance Run', 'duration': '45min', 'intensity': 'High'},
-        {'name': 'Tabata Intervals', 'sets': 8, 'work': '20s', 'rest': '10s'},
-        {'name': 'Hill Sprints', 'sets': 10, 'work': '30s', 'rest': '90s'},
+        {'name': 'Push-ups', 'sets': 4, 'reps': '12', 'rest': '60s'},
+        {'name': 'Pull-ups', 'sets': 4, 'reps': '8', 'rest': '60s'},
+        {'name': 'Dips', 'sets': 4, 'reps': '10', 'rest': '60s'},
+        {'name': 'Diamond Push-ups', 'sets': 3, 'reps': '10', 'rest': '60s'},
       ],
     },
   ];
@@ -74,7 +46,7 @@ class _PresetRoutinesScreenState extends State<PresetRoutinesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Preset Routines'),
+        title: Text('Workout Routines'),
         backgroundColor: Colors.purple,
       ),
       body: ListView.builder(
@@ -84,11 +56,36 @@ class _PresetRoutinesScreenState extends State<PresetRoutinesScreen> {
           return Card(
             margin: EdgeInsets.all(8),
             child: ExpansionTile(
-              title: Text(
-                routine['name'],
-                style: TextStyle(fontWeight: FontWeight.bold),
+              title: Row(
+                children: [
+                  Icon(
+                    _getRoutineIcon(routine['level']),
+                    color: _getLevelColor(routine['level']),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          routine['name'],
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          routine['level'],
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              subtitle: Text(routine['level']),
               children: [
                 Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -97,22 +94,38 @@ class _PresetRoutinesScreenState extends State<PresetRoutinesScreen> {
                     children: [
                       Text(
                         'Exercises:',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                       SizedBox(height: 8),
-                      ...routine['exercises'].map<Widget>((exercise) => ListTile(
+                      ...routine['exercises'].map<Widget>((exercise) {
+                        return Card(
+                          color: Colors.grey[100],
+                          child: ListTile(
+                            leading: Icon(Icons.fitness_center),
                             title: Text(exercise['name']),
                             subtitle: Text(
-                              exercise['sets'] != null
-                                  ? '${exercise['sets']} sets × ${exercise['reps']} reps (Rest: ${exercise['rest']})'
-                                  : '${exercise['duration']} (${exercise['intensity']} intensity)',
+                              exercise['duration'] != null
+                                  ? '${exercise['sets']} sets × ${exercise['duration']} (Rest: ${exercise['rest']})'
+                                  : '${exercise['sets']} sets × ${exercise['reps']} reps (Rest: ${exercise['rest']})',
                             ),
-                          )),
+                          ),
+                        );
+                      }).toList(),
                       SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => _startRoutine(routine),
-                        child: Text('Start Workout'),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _startRoutine(routine),
+                          icon: Icon(Icons.play_arrow),
+                          label: Text('Start Workout'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -125,49 +138,63 @@ class _PresetRoutinesScreenState extends State<PresetRoutinesScreen> {
     );
   }
 
-  void _startRoutine(Map<String, dynamic> routine) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Start ${routine['name']}?'),
-        content: Text('This will create a new workout session with these exercises.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                // Create a new workout session
-                final workoutId = await DatabaseHelper.instance.saveWorkout(
-                  routine['name'],
-                  DateTime.now(),
-                  0, // Duration will be updated when workout is completed
-                  'In Progress',
-                );
+  IconData _getRoutineIcon(String level) {
+    switch (level.toLowerCase()) {
+      case 'beginner':
+        return Icons.star_outline;
+      case 'intermediate':
+        return Icons.star_half;
+      case 'advanced':
+        return Icons.star;
+      default:
+        return Icons.fitness_center;
+    }
+  }
 
-                // Navigate to workout screen with the routine
-                Navigator.pop(context); // Close dialog
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => WorkoutScreen(
-                      workoutId: workoutId,
-                      routine: routine,
-                    ),
-                  ),
-                );
-              } catch (e) {
-                print('Error starting workout: $e');
-                // Show error message to user
-              }
-            },
-            child: Text('Start'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+  Color _getLevelColor(String level) {
+    switch (level.toLowerCase()) {
+      case 'beginner':
+        return Colors.green;
+      case 'intermediate':
+        return Colors.orange;
+      case 'advanced':
+        return Colors.red;
+      default:
+        return Colors.purple;
+    }
+  }
+
+  void _startRoutine(Map<String, dynamic> routine) async {
+    try {
+      // Save the routine to the database and get its ID
+      final workoutId = await DatabaseHelper.instance.saveWorkout(
+        name: routine['name'],
+        level: routine['level'],
+        exercises: routine['exercises'],
+      );
+
+      // Navigate to the workout screen
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => WorkoutScreen(
+            workoutId: workoutId,
+            routine: routine,
           ),
-        ],
-      ),
-    );
+        ),
+      );
+
+      // If workout was completed, show success message
+      if (result == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Workout completed!')),
+        );
+      }
+    } catch (e) {
+      print('Error starting workout: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error starting workout')),
+      );
+    }
   }
 } 

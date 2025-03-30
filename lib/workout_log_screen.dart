@@ -184,11 +184,13 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
                     : 0.0;
 
                 await DatabaseHelper.instance.saveWorkoutLog(
-                  exerciseController.text,
-                  sets,
-                  reps,
-                  weight,
-                  DateTime.now(),
+                  exercise: exerciseController.text,
+                  sets: sets,
+                  reps: reps,
+                  weight: weight,
+                  date: DateTime.now(),
+                  duration: 0, // Add default duration for manual logs
+                  calories: 0, // Add default calories for manual logs
                 );
 
                 Navigator.pop(context);

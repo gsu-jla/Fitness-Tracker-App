@@ -11,35 +11,95 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    
-    // Initialize FFI for desktop platforms
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-    }
-    
     _database = await _initDB('fitness_tracker.db');
-    await _createTablesIfNotExist();
     return _database!;
   }
 
-  // Initialize database
   Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
+    // Get the correct path for the database
+    final documentsPath = Directory.current.path;
+    final dbPath = join(documentsPath, '.dart_tool', 'sqflite_common_ffi', 'databases');
     final path = join(dbPath, filePath);
 
-    // Make sure the directory exists
+    // Ensure the directory exists
     await Directory(dbPath).create(recursive: true);
 
-    // Open database with explicit read/write mode
-    return await databaseFactory.openDatabase(
+    print('Opening database at: $path'); // Debug print
+
+    return await openDatabase(
       path,
-      options: OpenDatabaseOptions(
-        version: 1,
-        onCreate: _createDB,
-        readOnly: false, // Explicitly set read/write mode
-      ),
+      version: 3, // Increment from 2 to 3
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
+  }
+
+  Future _createDB(Database db, int version) async {
+    // Create tables with all required columns
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS workout_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        exercise TEXT,
+        sets INTEGER,
+        reps INTEGER,
+        weight REAL,
+        date TEXT,
+        duration INTEGER DEFAULT 0,
+        calories INTEGER DEFAULT 0,
+        completed BOOLEAN DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS weight_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        weight REAL,
+        date TEXT
+      )
+    ''');
+
+    // Insert default settings if they don't exist
+    await db.insert(
+      'settings',
+      {'key': 'weight_unit', 'value': 'lbs'},
+      conflictAlgorithm: ConflictAlgorithm.replace
+    );
+
+    await db.insert(
+      'settings',
+      {'key': 'user_weight', 'value': '70.0'},
+      conflictAlgorithm: ConflictAlgorithm.replace
+    );
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    print('Upgrading database from $oldVersion to $newVersion');
+    if (oldVersion < newVersion) {
+      // Drop the existing table
+      await db.execute('DROP TABLE IF EXISTS workout_logs');
+      
+      // Recreate the table with correct schema
+      await db.execute('''
+        CREATE TABLE workout_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          exercise TEXT,
+          sets INTEGER,
+          reps INTEGER,
+          weight REAL,
+          date TEXT,
+          duration INTEGER DEFAULT 0,
+          calories INTEGER DEFAULT 0,
+          completed BOOLEAN DEFAULT 0
+        )
+      ''');
+    }
   }
 
   // Create tables if they don't exist
@@ -112,108 +172,9 @@ class DatabaseHelper {
       ''');
     }
 
-    // Create workout_history table
-    if (!tableNames.contains('workout_history')) {
-      await db.execute('''
-        CREATE TABLE workout_history (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          date TEXT NOT NULL,
-          duration INTEGER NOT NULL,
-          calories INTEGER NOT NULL,
-          exercises INTEGER NOT NULL
-        )
-      ''');
-    }
-
     // Check if default settings exist
     final settings = await db.query('settings');
     if (settings.isEmpty) {
-      await db.insert('settings', {
-        'key': 'daily_calorie_goal',
-        'value': '2000',
-      });
-    }
-  }
-
-  // Create database tables
-  Future<void> _createDB(Database db, int version) async {
-    // Settings table
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      )
-    ''');
-
-    // Meals table
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS meals (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL,
-        date TEXT NOT NULL
-      )
-    ''');
-
-    // Foods table
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS foods (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        meal_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        calories INTEGER NOT NULL,
-        FOREIGN KEY (meal_id) REFERENCES meals (id)
-      )
-    ''');
-
-    // Workouts table
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS workouts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        date TEXT NOT NULL,
-        duration INTEGER,
-        status TEXT NOT NULL
-      )
-    ''');
-
-    // Progress metrics table
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS progress_metrics (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        current_value REAL NOT NULL,
-        goal_value REAL NOT NULL,
-        date TEXT NOT NULL
-      )
-    ''');
-
-    // Add workout history table if it doesn't exist
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS workout_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        date TEXT NOT NULL,
-        duration INTEGER NOT NULL,
-        calories INTEGER NOT NULL,
-        exercises INTEGER NOT NULL
-      )
-    ''');
-
-    // Add workout logs table if it doesn't exist
-    await db.execute('''
-      CREATE TABLE workout_logs(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        exercise TEXT NOT NULL,
-        sets INTEGER NOT NULL,
-        reps INTEGER NOT NULL,
-        weight REAL,
-        date TEXT NOT NULL
-      )
-    ''');
-
-    // Check if default settings exist
-    final List<Map<String, dynamic>> settings = await db.query('settings');
-    if (settings.isEmpty) {
-      // Insert default settings
       await db.insert('settings', {
         'key': 'daily_calorie_goal',
         'value': '2000',
@@ -304,14 +265,34 @@ class DatabaseHelper {
   }
 
   // Save workout
-  Future<int> saveWorkout(String name, DateTime date, int duration, String status) async {
-    final db = await instance.database;
-    return await db.insert('workouts', {
+  Future<int> saveWorkout({
+    required String name,
+    required String level,
+    required List<Map<String, dynamic>> exercises,
+  }) async {
+    final db = await database;
+    
+    // Save the workout
+    final workoutId = await db.insert('workouts', {
       'name': name,
-      'date': date.toIso8601String(),
-      'duration': duration,
-      'status': status,
+      'level': level,
+      'date': DateTime.now().toIso8601String(),
+      'status': 'In Progress',
     });
+
+    // Save exercises
+    for (var exercise in exercises) {
+      await db.insert('exercises', {
+        'workout_id': workoutId,
+        'name': exercise['name'],
+        'sets': exercise['sets'],
+        'reps': exercise['reps'] ?? '',
+        'duration': exercise['duration'] ?? '',
+        'rest': exercise['rest'],
+      });
+    }
+
+    return workoutId;
   }
 
   // Get workouts for a specific date
@@ -444,23 +425,19 @@ class DatabaseHelper {
   }
 
   // Get workout history
-  Future<List<Map<String, dynamic>>> getWorkoutHistory({int daysBack = 30}) async {
+  Future<List<Map<String, dynamic>>> getWorkoutHistory() async {
     final db = await database;
-    final cutoffDate = DateTime.now().subtract(Duration(days: daysBack));
-    
-    final results = await db.query(
-      'workout_history',
-      where: 'date > ?',
-      whereArgs: [cutoffDate.toIso8601String()],
-      orderBy: 'date ASC',
-    );
-
-    return results.map((row) => {
-      'date': DateTime.parse(row['date'] as String),
-      'duration': row['duration'] as int,
-      'calories': row['calories'] as int,
-      'exercises': row['exercises'] as int,
-    }).toList();
+    try {
+      final results = await db.query(
+        'workout_logs',
+        orderBy: 'date DESC',
+      );
+      print('Workout history query results: $results');
+      return results;
+    } catch (e) {
+      print('Error getting workout history: $e');
+      return [];
+    }
   }
 
   // Add this method if it doesn't exist
@@ -526,7 +503,15 @@ class DatabaseHelper {
     );
   }
 
-  Future<void> saveWorkoutLog(String exercise, int sets, int reps, double weight, DateTime date) async {
+  Future<void> saveWorkoutLog({
+    required String exercise,
+    required int sets,
+    required int reps,
+    required double weight,
+    required DateTime date,
+    required int duration,
+    required int calories,
+  }) async {
     final db = await database;
     await db.insert(
       'workout_logs',
@@ -536,6 +521,8 @@ class DatabaseHelper {
         'reps': reps,
         'weight': weight,
         'date': date.toIso8601String(),
+        'duration': duration,
+        'calories': calories,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
@@ -547,5 +534,168 @@ class DatabaseHelper {
       'workout_logs',
       orderBy: 'date DESC',
     );
+  }
+
+  Future<void> updateWeight(double weight) async {
+    final db = await database;
+    await db.insert(
+      'weight_history',
+      {
+        'weight': weight,
+        'date': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<Map<String, double>> getWeightProgress() async {
+    final db = await database;
+    final unit = await getWeightUnit();
+    final multiplier = unit == 'lbs' ? 2.20462 : 1.0; // Convert kg to lbs if needed
+    
+    final startingWeight = await db.query(
+      'weight_history',
+      orderBy: 'date ASC',
+      limit: 1,
+    );
+    
+    final currentWeight = await db.query(
+      'weight_history',
+      orderBy: 'date DESC',
+      limit: 1,
+    );
+    
+    final goalWeight = await db.query(
+      'settings',
+      where: 'key = ?',
+      whereArgs: ['weight_goal'],
+    );
+    
+    return {
+      'starting': startingWeight.isNotEmpty ? (startingWeight.first['weight'] as num).toDouble() * multiplier : 0.0,
+      'current': currentWeight.isNotEmpty ? (currentWeight.first['weight'] as num).toDouble() * multiplier : 0.0,
+      'goal': goalWeight.isNotEmpty ? double.parse(goalWeight.first['value'].toString()) * multiplier : 0.0,
+    };
+  }
+
+  Future<Map<String, int>> getWeeklySummary() async {
+    final db = await database;
+    final now = DateTime.now();
+    final weekStart = DateTime(now.year, now.month, now.day - now.weekday + 1).toIso8601String();
+    
+    try {
+      final result = await db.rawQuery('''
+        SELECT 
+          COUNT(DISTINCT date) as sessions,
+          COALESCE(SUM(duration), 0) as total_minutes,
+          COALESCE(SUM(calories), 0) as total_calories
+        FROM workout_logs
+        WHERE date >= ?
+      ''', [weekStart]);
+      
+      return {
+        'sessions': (result.first['sessions'] as num?)?.toInt() ?? 0,
+        'minutes': (result.first['total_minutes'] as num?)?.toInt() ?? 0,
+        'calories': (result.first['total_calories'] as num?)?.toInt() ?? 0,
+      };
+    } catch (e) {
+      print('Error getting weekly summary: $e');
+      return {
+        'sessions': 0,
+        'minutes': 0,
+        'calories': 0,
+      };
+    }
+  }
+
+  Future<void> updateWeightGoal(double goal) async {
+    final db = await database;
+    await db.insert(
+      'settings',
+      {
+        'key': 'weight_goal',
+        'value': goal.toString(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> saveWeightUnit(String unit) async {
+    final db = await database;
+    await db.insert(
+      'settings',
+      {
+        'key': 'weight_unit',
+        'value': unit,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<String> getWeightUnit() async {
+    final db = await database;
+    final results = await db.query(
+      'settings',
+      where: 'key = ?',
+      whereArgs: ['weight_unit'],
+    );
+    
+    return results.isEmpty ? 'lbs' : results.first['value'] as String;
+  }
+
+  Future<List<Map<String, dynamic>>> getWeightHistory() async {
+    final db = await database;
+    try {
+      final results = await db.query(
+        'weight_history',
+        orderBy: 'date DESC',
+      );
+      print('Weight history query results: $results');
+      return results;
+    } catch (e) {
+      print('Error getting weight history: $e');
+      return [];
+    }
+  }
+
+  Future<void> saveUserWeight(double weightKg) async {
+    final db = await database;
+    await db.insert(
+      'weight_history',
+      {
+        'weight': weightKg,
+        'date': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<double> getUserWeight() async {
+    final db = await database;
+    final result = await db.query(
+      'settings',
+      where: 'key = ?',
+      whereArgs: ['user_weight'],
+    );
+    
+    if (result.isEmpty) {
+      return 70.0; // Default weight in kg
+    }
+    
+    return double.parse(result.first['value'] as String);
+  }
+
+  Future<int> getTodayCaloriesBurned() async {
+    final db = await database;
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day).toIso8601String();
+    
+    final result = await db.rawQuery('''
+      SELECT SUM(calories) as total_calories
+      FROM workout_logs
+      WHERE date >= ?
+    ''', [startOfDay]);
+    
+    return (result.first['total_calories'] as num?)?.toInt() ?? 0;
   }
 } 

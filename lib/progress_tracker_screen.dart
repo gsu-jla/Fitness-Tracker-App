@@ -9,288 +9,182 @@ class ProgressTrackerScreen extends StatefulWidget {
 }
 
 class _ProgressTrackerScreenState extends State<ProgressTrackerScreen> {
-  List<Map<String, dynamic>> _progressData = [];
   bool _isLoading = true;
+  Map<String, double> _weightData = {
+    'starting': 0.0,
+    'current': 0.0,
+    'goal': 0.0,
+  };
+  Map<String, int> _weeklySummary = {
+    'sessions': 0,
+    'minutes': 0,
+    'calories': 0,
+  };
+  String _weightUnit = 'lbs'; // Default to pounds
 
   @override
   void initState() {
     super.initState();
-    _loadProgressData();
+    _loadAllData();
   }
 
-  // Load progress data from database
-  Future<void> _loadProgressData() async {
+  Future<void> _loadAllData() async {
+    setState(() => _isLoading = true);
     try {
-      final data = await DatabaseHelper.instance.getProgressMetrics();
+      _weightUnit = await DatabaseHelper.instance.getWeightUnit();
+      final weightProgress = await DatabaseHelper.instance.getWeightProgress();
+      final weeklySummary = await DatabaseHelper.instance.getWeeklySummary();
+      
       setState(() {
-        _progressData = data;
+        _weightData = weightProgress;
+        _weeklySummary = weeklySummary;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading progress data: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      print('Error loading data: $e');
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading data')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
     return Scaffold(
-      // App bar with title and purple theme
       appBar: AppBar(
         title: Text('Progress Tracker'),
         backgroundColor: Colors.purple,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.bar_chart),
-            onPressed: _showChartsScreen,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // Summary section at the top
-                _buildSummarySection(),
-                // List of progress metrics
-                Expanded(
-                  child: _buildProgressList(),
-                ),
-              ],
-            ),
-      // Floating action button to add new metrics
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddMetricDialog,
-        child: Icon(Icons.add),
+        ),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Progress Tracker'),
         backgroundColor: Colors.purple,
       ),
-    );
-  }
-
-  // Build the summary section showing overall progress
-  Widget _buildSummarySection() {
-    return Container(
+      body: RefreshIndicator(
+        onRefresh: _loadAllData,
+        child: SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Weekly Summary Card
+              Card(
+                child: Padding(
       padding: EdgeInsets.all(16),
-      color: Colors.purple.withOpacity(0.1),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Overall Progress',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 16),
-          // Calculate and display overall progress
-          Text(
-            '${_calculateOverallProgress().toStringAsFixed(2)}% of goals achieved',
-            style: TextStyle(fontSize: 18),
+                        'Weekly Summary',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
           ),
           SizedBox(height: 8),
-          // Progress bar for overall progress
-          LinearProgressIndicator(
-            value: _calculateOverallProgress() / 100,
-            backgroundColor: Colors.grey[200],
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.purple),
-            minHeight: 10,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Workouts:'),
+                          Text('${_weeklySummary['sessions']} sessions'),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Total Time:'),
+                          Text('${_weeklySummary['minutes']} minutes'),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Calories Burned:'),
+                          Text('${_weeklySummary['calories']} cal'),
+                        ],
           ),
         ],
       ),
-    );
-  }
-
-  // Build the list of progress metrics
-  Widget _buildProgressList() {
-    return ListView.builder(
-      itemCount: _progressData.length,
-      itemBuilder: (context, index) {
-        final metric = _progressData[index];
-        return Card(
-          margin: EdgeInsets.all(8),
-          child: ExpansionTile(
-            title: Text(
-              metric['name'],
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              '${metric['current_value']} ${metric['unit']} / Goal: ${metric['goal_value']} ${metric['unit']}',
-            ),
-            children: [
-              // Progress details
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Progress bar for this metric
-                    LinearProgressIndicator(
-                      value: metric['current_value'] / metric['goal_value'],
-                      backgroundColor: Colors.grey[200],
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        metric['current_value'] >= metric['goal_value'] ? Colors.green : Colors.purple,
-                      ),
-                      minHeight: 10,
+                ),
                     ),
                     SizedBox(height: 16),
-                    // History section
-                    Text(
-                      'History',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+              
+              // Updated Weight Progress Card
+              _buildWeightProgressCard(),
+              
+              SizedBox(height: 16),
+              
+              // Action Buttons
+              _buildActionButton(
+                'Update Weight',
+                Icons.edit,
+                () => _showUpdateWeightDialog(),
                     ),
                     SizedBox(height: 8),
-                    // List of historical values
-                    ...metric['history'].map<Widget>((record) => ListTile(
-                          title: Text('${record['value']} ${metric['unit']}'),
-                          subtitle: Text(_formatDate(record['date'])),
-                        )),
-                    // Action buttons
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton.icon(
-                          onPressed: () => _showEditMetricDialog(metric, index),
-                          icon: Icon(Icons.edit),
-                          label: Text('Edit'),
-                        ),
-                        TextButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _progressData.removeAt(index);
-                            });
-                          },
-                          icon: Icon(Icons.delete, color: Colors.red),
-                          label: Text('Delete', style: TextStyle(color: Colors.red)),
+              _buildActionButton(
+                'View Charts',
+                Icons.bar_chart,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ProgressChartsScreen()),
+                ),
+              ),
+              SizedBox(height: 8),
+              _buildActionButton(
+                'Set New Goals',
+                Icons.flag,
+                () => _showSetGoalsDialog(),
                         ),
                       ],
                     ),
-                    Text(
-                      'Current: ${metric['current_value']} ${metric['unit']}',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    Text(
-                      'Goal: ${metric['goal_value']} ${metric['unit']}',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    Text(
-                      'Progress: ${(metric['current_value'] / metric['goal_value'] * 100).toStringAsFixed(2)}%',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: _getProgressColor(metric['current_value'] / metric['goal_value']),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // Calculate overall progress percentage
-  double _calculateOverallProgress() {
-    if (_progressData.isEmpty) return 0;
-    
-    double totalProgress = 0;
-    for (var metric in _progressData) {
-      totalProgress += (metric['current_value'] / metric['goal_value']) * 100;
-    }
-    return totalProgress / _progressData.length;
-  }
-
-  // Show dialog to add a new metric
-  void _showAddMetricDialog() {
-    final nameController = TextEditingController();
-    final currentController = TextEditingController();
-    final goalController = TextEditingController();
-    final unitController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add New Metric'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(labelText: 'Metric Name'),
-            ),
-            TextField(
-              controller: currentController,
-              decoration: InputDecoration(labelText: 'Current Value'),
-              keyboardType: TextInputType.number,
-            ),
-            TextField(
-              controller: goalController,
-              decoration: InputDecoration(labelText: 'Goal Value'),
-              keyboardType: TextInputType.number,
-            ),
-            TextField(
-              controller: unitController,
-              decoration: InputDecoration(labelText: 'Unit (e.g., kg, reps, km)'),
-            ),
-          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.isNotEmpty &&
-                  currentController.text.isNotEmpty &&
-                  goalController.text.isNotEmpty &&
-                  unitController.text.isNotEmpty) {
-                try {
-                  await DatabaseHelper.instance.addProgressMetric(
-                    nameController.text,
-                    double.parse(currentController.text),
-                    double.parse(goalController.text),
-                    unitController.text,
-                  );
-                  Navigator.pop(context);
-                  _loadProgressData(); // Reload data
-                } catch (e) {
-                  print('Error adding metric: $e');
-                  // Show error message to user
-                }
-              }
-            },
-            child: Text('Add'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
-          ),
-        ],
       ),
     );
   }
 
-  // Show dialog to edit an existing metric
-  void _showEditMetricDialog(Map<String, dynamic> metric, int index) {
-    final currentController = TextEditingController(text: metric['current_value'].toString());
-    final goalController = TextEditingController(text: metric['goal_value'].toString());
+  Widget _buildActionButton(String title, IconData icon, VoidCallback onPressed) {
+    return Container(
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          side: BorderSide(color: Colors.black, width: 1),
+          backgroundColor: Colors.white,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+                    Text(
+              title,
+              style: TextStyle(color: Colors.black),
+            ),
+            Icon(icon, color: Colors.black),
+                  ],
+                ),
+              ),
+    );
+  }
+
+  void _showUpdateWeightDialog() {
+    final weightController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Edit ${metric['name']}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: currentController,
-              decoration: InputDecoration(labelText: 'Current Value'),
-              keyboardType: TextInputType.number,
-            ),
-            TextField(
-              controller: goalController,
-              decoration: InputDecoration(labelText: 'Goal Value'),
-              keyboardType: TextInputType.number,
-            ),
-          ],
+        title: Text('Update Weight'),
+        content: TextField(
+          controller: weightController,
+          decoration: InputDecoration(
+            labelText: 'Current Weight ($_weightUnit)',
+          ),
+          keyboardType: TextInputType.numberWithOptions(decimal: true),
         ),
         actions: [
           TextButton(
@@ -299,20 +193,23 @@ class _ProgressTrackerScreenState extends State<ProgressTrackerScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (currentController.text.isNotEmpty &&
-                  goalController.text.isNotEmpty) {
-                try {
-                  await DatabaseHelper.instance.updateProgressMetric(
-                    metric['id'],
-                    double.parse(currentController.text),
-                    double.parse(goalController.text),
-                  );
-                  Navigator.pop(context);
-                  _loadProgressData(); // Reload data
-                } catch (e) {
-                  print('Error updating metric: $e');
-                  // Show error message to user
+              try {
+                if (weightController.text.isEmpty) return;
+                double weight = double.parse(weightController.text);
+                // Convert to kg if input is in lbs
+                if (_weightUnit == 'lbs') {
+                  weight = weight / 2.20462;
                 }
+                await DatabaseHelper.instance.updateWeight(weight);
+                Navigator.pop(context);
+                await _loadAllData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Weight updated successfully')),
+                );
+                } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error updating weight')),
+                );
               }
             },
             child: Text('Save'),
@@ -323,29 +220,171 @@ class _ProgressTrackerScreenState extends State<ProgressTrackerScreen> {
     );
   }
 
-  // Format date to DD/MM/YYYY format
-  String _formatDate(String dateString) {
-    final date = DateTime.parse(dateString);
-    return '${date.day}/${date.month}/${date.year}';
-  }
+  void _showSetGoalsDialog() {
+    final goalController = TextEditingController();
 
-  // Get progress color based on progress percentage
-  Color _getProgressColor(double progress) {
-    if (progress >= 1.0) return Colors.green;
-    if (progress >= 0.5) return Colors.yellow;
-    return Colors.red;
-  }
-
-  // Add this method
-  void _showChartsScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProgressChartsScreen(),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Set Weight Goal'),
+        content: TextField(
+              controller: goalController,
+          decoration: InputDecoration(
+            labelText: 'Goal Weight ($_weightUnit)',
+            ),
+          keyboardType: TextInputType.numberWithOptions(decimal: true),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                if (goalController.text.isEmpty) return;
+                double goal = double.parse(goalController.text);
+                
+                // Convert to kg if input is in lbs
+                if (_weightUnit == 'lbs') {
+                  goal = goal / 2.20462; // Convert lbs to kg for storage
+                }
+                
+                await DatabaseHelper.instance.updateWeightGoal(goal);
+                Navigator.pop(context);
+                await _loadAllData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Goal updated successfully')),
+                );
+                } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error updating goal')),
+                );
+              }
+            },
+            child: Text('Save'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+          ),
+        ],
       ),
-    ).then((_) {
-      // Reload data when returning from charts screen
-      _loadProgressData();
-    });
+    );
+  }
+
+  void _toggleWeightUnit() async {
+    final newUnit = _weightUnit == 'lbs' ? 'kg' : 'lbs';
+    await DatabaseHelper.instance.saveWeightUnit(newUnit);
+    await _loadAllData(); // This will refresh the data with the new unit
+  }
+
+  double calculateProgress() {
+    if (_weightData['current'] == 0.0 || _weightData['goal'] == 0.0) {
+      return 0.0;
+    }
+    
+    // Simple percentage: current/goal
+    return (_weightData['current']! / _weightData['goal']!).clamp(0.0, 1.0);
+  }
+
+  Widget _buildWeightProgressCard() {
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Weight Progress',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                // Add current/goal text
+                Text(
+                  '${_weightData['current']?.toStringAsFixed(1)} / ${_weightData['goal']?.toStringAsFixed(1)} $_weightUnit',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.purple,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Starting: ${_weightData['starting']?.toStringAsFixed(1)} $_weightUnit',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          'Goal: ',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                        Text(
+                          '${_weightData['goal']?.toStringAsFixed(1)} $_weightUnit',
+                          style: TextStyle(color: Colors.purple),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(
+                          _weightData['starting']! > _weightData['goal']! 
+                              ? Icons.arrow_downward 
+                              : Icons.arrow_upward,
+                          size: 16,
+                          color: Colors.purple,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                // Circular progress indicator
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: calculateProgress(),
+                      backgroundColor: Colors.grey[200],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        calculateProgress() < 1.0 ? Colors.purple : Colors.green,
+                      ),
+                    ),
+                    Text(
+                      '${((_weightData['current']! / _weightData['goal']!) * 100).toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            SizedBox(height: 16),
+            if (_weightData['starting'] != 0.0 && 
+                _weightData['current'] != 0.0 && 
+                _weightData['goal'] != 0.0) ...[
+              LinearProgressIndicator(
+                value: calculateProgress().clamp(0.0, 1.0),
+                backgroundColor: Colors.grey[200],
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  calculateProgress() < 1.0 ? Colors.purple : Colors.green,
+                ),
+                minHeight: 8,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 } 
