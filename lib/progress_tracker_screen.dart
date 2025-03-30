@@ -2,46 +2,56 @@ import 'package:flutter/material.dart';
 import 'progress_charts_screen.dart';
 import 'database/database_helper.dart';
 
-// Screen for tracking fitness progress over time
+// Screen for displaying overall fitness progress metrics
 class ProgressTrackerScreen extends StatefulWidget {
   @override
   _ProgressTrackerScreenState createState() => _ProgressTrackerScreenState();
 }
 
 class _ProgressTrackerScreenState extends State<ProgressTrackerScreen> {
+  // Loading state indicator
   bool _isLoading = true;
+
+  // Store weight tracking data
   Map<String, double> _weightData = {
-    'starting': 0.0,
-    'current': 0.0,
-    'goal': 0.0,
+    'starting': 0.0,  // First recorded weight
+    'current': 0.0,   // Most recent weight
+    'goal': 0.0,      // Target weight
   };
+
+  // Store weekly workout statistics
   Map<String, int> _weeklySummary = {
-    'sessions': 0,
-    'minutes': 0,
-    'calories': 0,
+    'sessions': 0,    // Number of workouts this week
+    'minutes': 0,     // Total workout duration
+    'calories': 0,    // Total calories burned
   };
-  String _weightUnit = 'lbs'; // Default to pounds
+
+  // User's preferred weight unit
+  String _weightUnit = 'lbs';
 
   @override
   void initState() {
     super.initState();
-    _loadAllData();
+    _loadAllData();  // Load data when screen initializes
   }
 
+  // Fetch all required data from database
   Future<void> _loadAllData() async {
     setState(() => _isLoading = true);
     try {
+      // Get user preferences and progress data
       _weightUnit = await DatabaseHelper.instance.getWeightUnit();
       final weightProgress = await DatabaseHelper.instance.getWeightProgress();
       final weeklySummary = await DatabaseHelper.instance.getWeeklySummary();
       
+      // Update state with fetched data
       setState(() {
         _weightData = weightProgress;
         _weeklySummary = weeklySummary;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading data: $e');
+      // Handle error state
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading data')),
@@ -51,11 +61,12 @@ class _ProgressTrackerScreenState extends State<ProgressTrackerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Show loading indicator while fetching data
     if (_isLoading) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Progress Tracker'),
-        backgroundColor: Colors.purple,
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Progress Tracker'),
+          backgroundColor: Colors.purple,
         ),
         body: Center(child: CircularProgressIndicator()),
       );

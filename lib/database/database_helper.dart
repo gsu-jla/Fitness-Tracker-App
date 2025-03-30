@@ -3,18 +3,22 @@ import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:io';
 
+// Database helper class to manage all SQLite operations
 class DatabaseHelper {
+  // Singleton instance
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
   DatabaseHelper._init();
 
+  // Get database instance, creating it if needed
   Future<Database> get database async {
     if (_database != null) return _database!;
     _database = await _initDB('fitness_tracker.db');
     return _database!;
   }
 
+  // Initialize the database with required tables
   Future<Database> _initDB(String filePath) async {
     // Get the correct path for the database
     final documentsPath = Directory.current.path;
@@ -548,29 +552,35 @@ class DatabaseHelper {
     );
   }
 
+  // Get user's weight progress data
   Future<Map<String, double>> getWeightProgress() async {
     final db = await database;
     final unit = await getWeightUnit();
-    final multiplier = unit == 'lbs' ? 2.20462 : 1.0; // Convert kg to lbs if needed
+    // Convert weight to appropriate unit (kg/lbs)
+    final multiplier = unit == 'lbs' ? 2.20462 : 1.0;
     
+    // Get first recorded weight
     final startingWeight = await db.query(
       'weight_history',
       orderBy: 'date ASC',
       limit: 1,
     );
     
+    // Get most recent weight
     final currentWeight = await db.query(
       'weight_history',
       orderBy: 'date DESC',
       limit: 1,
     );
     
+    // Get user's goal weight from settings
     final goalWeight = await db.query(
       'settings',
       where: 'key = ?',
       whereArgs: ['weight_goal'],
     );
     
+    // Return weight data with appropriate unit conversion
     return {
       'starting': startingWeight.isNotEmpty ? (startingWeight.first['weight'] as num).toDouble() * multiplier : 0.0,
       'current': currentWeight.isNotEmpty ? (currentWeight.first['weight'] as num).toDouble() * multiplier : 0.0,
@@ -578,12 +588,15 @@ class DatabaseHelper {
     };
   }
 
+  // Get summary of workouts for current week
   Future<Map<String, int>> getWeeklySummary() async {
     final db = await database;
+    // Calculate start of current week
     final now = DateTime.now();
     final weekStart = DateTime(now.year, now.month, now.day - now.weekday + 1).toIso8601String();
     
     try {
+      // Query to get workout totals for current week
       final result = await db.rawQuery('''
         SELECT 
           COUNT(DISTINCT date) as sessions,
@@ -593,13 +606,14 @@ class DatabaseHelper {
         WHERE date >= ?
       ''', [weekStart]);
       
+      // Return workout summary data
       return {
         'sessions': (result.first['sessions'] as num?)?.toInt() ?? 0,
         'minutes': (result.first['total_minutes'] as num?)?.toInt() ?? 0,
         'calories': (result.first['total_calories'] as num?)?.toInt() ?? 0,
       };
     } catch (e) {
-      print('Error getting weekly summary: $e');
+      // Return zeros if query fails
       return {
         'sessions': 0,
         'minutes': 0,

@@ -1,32 +1,36 @@
+// Import required packages and dependencies
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'database/database_helper.dart';
 import 'dart:math' as math;
 
-// Screen for visualizing progress with charts
+// Main screen widget for displaying progress charts
 class ProgressChartsScreen extends StatefulWidget {
   @override
   _ProgressChartsScreenState createState() => _ProgressChartsScreenState();
 }
 
 class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
+  // State variables to store workout and weight data
   List<Map<String, dynamic>> _workoutHistory = [];
   List<Map<String, dynamic>> _weightHistory = [];
   bool _isLoading = true;
-  String _weightUnit = 'lbs'; // Default to pounds
+  String _weightUnit = 'lbs';
 
   @override
   void initState() {
     super.initState();
-    _loadAllData();
+    _loadAllData(); // Initialize data when screen loads
   }
 
+  // Fetch all required data from database
   Future<void> _loadAllData() async {
     try {
       final workoutHistory = await DatabaseHelper.instance.getWorkoutHistory();
       final weightHistory = await DatabaseHelper.instance.getWeightHistory();
       final unit = await DatabaseHelper.instance.getWeightUnit();
       
+      // Update state with fetched data
       setState(() {
         _workoutHistory = workoutHistory;
         _weightHistory = weightHistory;
@@ -43,6 +47,7 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Show loading indicator while data is being fetched
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
@@ -53,6 +58,7 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
       );
     }
 
+    // Main screen layout
     return Scaffold(
       appBar: AppBar(
         title: Text('Progress Charts'),
@@ -63,6 +69,7 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Weight progress section
             Text(
               'Weight Progress',
               style: TextStyle(
@@ -73,6 +80,7 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
             SizedBox(height: 8),
             _buildWeightChart(),
             
+            // Calories burned section
             SizedBox(height: 24),
             Text(
               'Calories Burned',
@@ -89,11 +97,13 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
     );
   }
 
+  // Build the weight tracking line chart
   Widget _buildWeightChart() {
     if (_weightHistory.isEmpty) {
       return Center(child: Text('No weight data available'));
     }
 
+    // Sort weight data by date
     final sortedWeights = List<Map<String, dynamic>>.from(_weightHistory);
     sortedWeights.sort((a, b) {
       final dateA = DateTime.parse(a['date'] as String);
@@ -101,6 +111,7 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
       return dateA.compareTo(dateB);
     });
 
+    // Create data points for the chart
     final spots = sortedWeights.map((weight) {
       final date = DateTime.parse(weight['date'] as String);
       final weightValue = (weight['weight'] as num).toDouble();
@@ -108,6 +119,7 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
       return FlSpot(date.millisecondsSinceEpoch.toDouble(), displayWeight);
     }).toList();
 
+    // Calculate y-axis range and intervals
     double minWeight = spots.map((spot) => spot.y).reduce(math.min);
     double maxWeight = spots.map((spot) => spot.y).reduce(math.max);
     double padding = (maxWeight - minWeight) * 0.2;
@@ -118,6 +130,7 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
       yInterval = (yInterval / 5).ceil() * 5.0;
     }
 
+    // Calculate x-axis range and intervals
     final firstDate = DateTime.parse(sortedWeights.first['date'] as String);
     final lastDate = DateTime.parse(sortedWeights.last['date'] as String);
     final totalDays = lastDate.difference(firstDate).inDays;
@@ -125,6 +138,7 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
     final endDate = lastDate.add(Duration(days: 2));
     final xInterval = 86400000 * math.max((totalDays / 5).ceil(), 1).toDouble();
 
+    // Build the scrollable chart container
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Container(
@@ -133,15 +147,20 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
         padding: EdgeInsets.fromLTRB(16, 16, 32, 16),
         child: LineChart(
           LineChartData(
+            // Chart axis configuration
             minX: startDate.millisecondsSinceEpoch.toDouble(),
             maxX: endDate.millisecondsSinceEpoch.toDouble(),
             minY: yMin,
             maxY: yMax,
+            
+            // Grid configuration
             gridData: FlGridData(
               show: true,
               horizontalInterval: yInterval,
               verticalInterval: xInterval,
             ),
+            
+            // Axis titles and labels configuration
             titlesData: FlTitlesData(
               show: true,
               topTitles: AxisTitles(
@@ -185,6 +204,8 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
                 ),
               ),
             ),
+            
+            // Line and point styling
             lineBarsData: [
               LineChartBarData(
                 spots: spots,

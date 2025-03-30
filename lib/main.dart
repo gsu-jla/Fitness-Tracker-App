@@ -30,15 +30,20 @@ void main() async {
   // Initialize database with new schema
   await DatabaseHelper.instance.database;
 
-  runApp(MyApp());
+  runApp(FitnessTrackerApp());
 }
 
 // Root widget of the application
-class MyApp extends StatelessWidget {
+class FitnessTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: HomePage(), // Set HomePage as the initial screen
+      title: 'Fitness Tracker',
+      theme: ThemeData(
+        primarySwatch: Colors.purple,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+      ),
+      home: HomePage(),
     );
   }
 }
@@ -48,18 +53,18 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // App bar with title and purple background
+      // Main app bar with application title
       appBar: AppBar(
         title: Text('Home'),
         backgroundColor: Colors.purple,
       ),
-      // Main content area with navigation buttons
+      // Main content area containing navigation buttons
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Navigation buttons for different features
+            // Button to access workout logging feature
             buildButton(context, 'Workout Log', Icons.event_note, () {
               Navigator.push(
                 context,
@@ -67,6 +72,8 @@ class HomePage extends StatelessWidget {
               );
             }),
             SizedBox(height: 16),
+            
+            // Button to access calorie tracking feature
             buildButton(context, 'Calorie Tracker', Icons.event_note, () {
               Navigator.push(
                 context,
@@ -74,6 +81,8 @@ class HomePage extends StatelessWidget {
               );
             }),
             SizedBox(height: 16),
+            
+            // Button to access progress tracking feature
             buildButton(context, 'Progress Tracker', Icons.event_note, () {
               Navigator.push(
                 context,
@@ -81,6 +90,8 @@ class HomePage extends StatelessWidget {
               );
             }),
             SizedBox(height: 16),
+            
+            // Button to access preset workout routines
             buildButton(context, 'Preset Workouts', Icons.fitness_center, () {
               Navigator.push(
                 context,
@@ -93,17 +104,22 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // Helper method to create consistent navigation buttons
-  Widget buildButton(BuildContext context, String text, IconData icon, VoidCallback onPressed) {
+  // Helper method to build consistent navigation buttons
+  Widget buildButton(
+    BuildContext context, 
+    String text, 
+    IconData icon, 
+    VoidCallback onPressed
+  ) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: onPressed,
         icon: Icon(icon),
         label: Text(text),
+        onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.purple,
           padding: EdgeInsets.symmetric(vertical: 16),
+          backgroundColor: Colors.purple,
         ),
       ),
     );
