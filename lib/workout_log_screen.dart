@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'workout_screen.dart';
+import 'database/database_helper.dart';
 
 // Screen for logging completed workouts
 class WorkoutLogScreen extends StatefulWidget {
@@ -7,29 +9,34 @@ class WorkoutLogScreen extends StatefulWidget {
 }
 
 class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
-  // List of logged workouts with their details
-  final List<Map<String, dynamic>> _workoutLogs = [
-    {
-      'date': DateTime.now().subtract(Duration(days: 1)),
-      'workoutName': 'Push-ups',
-      'sets': 3,
-      'reps': 12,
-      'weight': null,
-      'duration': Duration(minutes: 15),
-      'notes': 'Felt strong today!',
-      'completed': true,
-    },
-    {
-      'date': DateTime.now().subtract(Duration(days: 2)),
-      'workoutName': 'Pull-ups',
-      'sets': 3,
-      'reps': 8,
-      'weight': null,
-      'duration': Duration(minutes: 20),
-      'notes': 'Need to improve form',
-      'completed': true,
-    },
-  ];
+  List<Map<String, dynamic>> _workoutLogs = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWorkoutData();
+  }
+
+  Future<void> _loadWorkoutData() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+      
+      final logs = await DatabaseHelper.instance.getWorkouts();
+      
+      setState(() {
+        _workoutLogs = logs;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading workout data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -195,6 +202,25 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   // Format date to DD/MM/YYYY format
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  void _startWorkout() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => WorkoutScreen(
+          workoutId: null,
+          routine: {
+            'name': 'Custom Workout',
+            'exercises': [],
+          },
+        ),
+      ),
+    ).then((completed) {
+      if (completed == true) {
+        _loadWorkoutData();
+      }
+    });
   }
 }
 

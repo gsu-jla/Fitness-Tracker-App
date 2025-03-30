@@ -20,10 +20,24 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   int _currentExerciseIndex = 0;
   bool _isLoading = true;
   Map<String, dynamic>? _currentWorkout;
+  
+  // Add these new variables
+  DateTime? _workoutStartTime;
+  Duration get _workoutDuration {
+    if (_workoutStartTime == null) return Duration.zero;
+    return DateTime.now().difference(_workoutStartTime!);
+  }
+  
+  // Estimate calories burned (this is a simple calculation, you might want to make it more sophisticated)
+  int get _caloriesBurned {
+    // Basic calculation: 6 calories per minute of exercise
+    return (_workoutDuration.inMinutes * 6).round();
+  }
 
   @override
   void initState() {
     super.initState();
+    _workoutStartTime = DateTime.now(); // Start timing when workout screen opens
     _loadWorkout();
   }
 
@@ -72,15 +86,31 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   Future<void> _completeWorkout() async {
     try {
       if (widget.workoutId != null) {
+        // Save workout status
         await DatabaseHelper.instance.updateWorkoutStatus(
           widget.workoutId!,
           'Completed',
           DateTime.now(),
         );
+        
+        // Save workout history
+        await DatabaseHelper.instance.saveWorkoutHistory(
+          duration: _workoutDuration.inMinutes,
+          calories: _caloriesBurned,
+          exercises: widget.routine?['exercises'].length ?? 0,
+        );
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Workout saved successfully!')),
+        );
       }
-      Navigator.pop(context);
+      Navigator.pop(context, true); // Pass back true to indicate completion
     } catch (e) {
       print('Error completing workout: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving workout')),
+      );
     }
   }
 

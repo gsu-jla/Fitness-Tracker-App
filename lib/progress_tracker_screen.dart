@@ -44,12 +44,7 @@ class _ProgressTrackerScreenState extends State<ProgressTrackerScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.bar_chart),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ProgressChartsScreen()),
-              );
-            },
+            onPressed: _showChartsScreen,
           ),
         ],
       ),
@@ -339,5 +334,18 @@ class _ProgressTrackerScreenState extends State<ProgressTrackerScreen> {
     if (progress >= 1.0) return Colors.green;
     if (progress >= 0.5) return Colors.yellow;
     return Colors.red;
+  }
+
+  // Add this method
+  void _showChartsScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProgressChartsScreen(),
+      ),
+    ).then((_) {
+      // Reload data when returning from charts screen
+      _loadProgressData();
+    });
   }
 } 

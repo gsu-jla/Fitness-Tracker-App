@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'database/database_helper.dart';
 
 // Screen for visualizing progress with charts
 class ProgressChartsScreen extends StatefulWidget {
@@ -8,54 +9,42 @@ class ProgressChartsScreen extends StatefulWidget {
 }
 
 class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
-  // Sample workout history data
-  final List<Map<String, dynamic>> _workoutHistory = [
-    {
-      'date': DateTime.now().subtract(Duration(days: 30)),
-      'duration': 45,
-      'calories': 350,
-      'exercises': 5,
-    },
-    {
-      'date': DateTime.now().subtract(Duration(days: 25)),
-      'duration': 60,
-      'calories': 450,
-      'exercises': 6,
-    },
-    {
-      'date': DateTime.now().subtract(Duration(days: 20)),
-      'duration': 45,
-      'calories': 400,
-      'exercises': 5,
-    },
-    {
-      'date': DateTime.now().subtract(Duration(days: 15)),
-      'duration': 75,
-      'calories': 550,
-      'exercises': 8,
-    },
-    {
-      'date': DateTime.now().subtract(Duration(days: 10)),
-      'duration': 60,
-      'calories': 500,
-      'exercises': 7,
-    },
-    {
-      'date': DateTime.now().subtract(Duration(days: 5)),
-      'duration': 90,
-      'calories': 650,
-      'exercises': 9,
-    },
-    {
-      'date': DateTime.now(),
-      'duration': 75,
-      'calories': 600,
-      'exercises': 8,
-    },
-  ];
+  List<Map<String, dynamic>> _workoutHistory = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWorkoutHistory();
+  }
+
+  Future<void> _loadWorkoutHistory() async {
+    try {
+      final history = await DatabaseHelper.instance.getWorkoutHistory();
+      setState(() {
+        _workoutHistory = history;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading workout history: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Progress Charts'),
+          backgroundColor: Colors.purple,
+        ),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Progress Charts'),
@@ -78,6 +67,15 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
   }
 
   Widget _buildWorkoutDurationChart() {
+    if (_workoutHistory.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: Text('No workout data available')),
+        ),
+      );
+    }
+
     return Card(
       child: Padding(
         padding: EdgeInsets.all(16),
@@ -89,7 +87,7 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 16),
-            Container(
+            SizedBox(
               height: 200,
               child: LineChart(
                 LineChartData(
@@ -102,9 +100,12 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
                       sideTitles: SideTitles(
                         showTitles: true,
                         getTitlesWidget: (value, meta) {
-                          if (value.toInt() >= _workoutHistory.length) return Text('');
-                          final date = _workoutHistory[value.toInt()]['date'];
-                          return Text('${date.day}/${date.month}');
+                          if (value.toInt() >= 0 && 
+                              value.toInt() < _workoutHistory.length) {
+                            final date = _workoutHistory[value.toInt()]['date'] as DateTime;
+                            return Text('${date.day}/${date.month}');
+                          }
+                          return Text('');
                         },
                       ),
                     ),
@@ -113,7 +114,10 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
                   lineBarsData: [
                     LineChartBarData(
                       spots: _workoutHistory.asMap().entries.map((entry) {
-                        return FlSpot(entry.key.toDouble(), entry.value['duration'].toDouble());
+                        return FlSpot(
+                          entry.key.toDouble(),
+                          entry.value['duration'].toDouble(),
+                        );
                       }).toList(),
                       isCurved: true,
                       color: Colors.purple,

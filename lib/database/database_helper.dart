@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'dart:io';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -8,16 +9,18 @@ class DatabaseHelper {
 
   DatabaseHelper._init();
 
-  // Initialize database
-  Future<void> init() async {
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    
     // Initialize FFI for desktop platforms
-    sqfliteFfiInit();
-    // Set the database factory
-    databaseFactory = databaseFactoryFfi;
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+    }
     
     _database = await _initDB('fitness_tracker.db');
-    // Ensure tables are created
     await _createTablesIfNotExist();
+    return _database!;
   }
 
   // Initialize database
@@ -25,10 +28,17 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(
+    // Make sure the directory exists
+    await Directory(dbPath).create(recursive: true);
+
+    // Open database with explicit read/write mode
+    return await databaseFactory.openDatabase(
       path,
-      version: 1,
-      onCreate: _createDB,
+      options: OpenDatabaseOptions(
+        version: 1,
+        onCreate: _createDB,
+        readOnly: false, // Explicitly set read/write mode
+      ),
     );
   }
 
@@ -102,6 +112,19 @@ class DatabaseHelper {
       ''');
     }
 
+    // Create workout_history table
+    if (!tableNames.contains('workout_history')) {
+      await db.execute('''
+        CREATE TABLE workout_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT NOT NULL,
+          duration INTEGER NOT NULL,
+          calories INTEGER NOT NULL,
+          exercises INTEGER NOT NULL
+        )
+      ''');
+    }
+
     // Check if default settings exist
     final settings = await db.query('settings');
     if (settings.isEmpty) {
@@ -164,6 +187,17 @@ class DatabaseHelper {
       )
     ''');
 
+    // Add workout history table if it doesn't exist
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS workout_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        duration INTEGER NOT NULL,
+        calories INTEGER NOT NULL,
+        exercises INTEGER NOT NULL
+      )
+    ''');
+
     // Check if default settings exist
     final List<Map<String, dynamic>> settings = await db.query('settings');
     if (settings.isEmpty) {
@@ -179,13 +213,6 @@ class DatabaseHelper {
   Future<void> close() async {
     final db = await instance.database;
     db.close();
-  }
-
-  // Get database instance
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDB('fitness_tracker.db');
-    return _database!;
   }
 
   // Save daily calorie goal
@@ -239,22 +266,29 @@ class DatabaseHelper {
     final db = await instance.database;
     final dateStr = date.toIso8601String().split('T')[0];
     
-    final List<Map<String, dynamic>> meals = await db.query(
+    // Get meals for the date
+    final meals = await db.query(
       'meals',
       where: 'date LIKE ?',
       whereArgs: ['$dateStr%'],
     );
 
+    // Get foods for each meal
+    List<Map<String, dynamic>> result = [];
     for (var meal in meals) {
-      final List<Map<String, dynamic>> foods = await db.query(
+      final foods = await db.query(
         'foods',
         where: 'meal_id = ?',
         whereArgs: [meal['id']],
       );
-      meal['foods'] = foods;
+
+      result.add({
+        ...meal,
+        'foods': foods,
+      });
     }
 
-    return meals;
+    return result;
   }
 
   // Save workout
@@ -376,6 +410,91 @@ class DatabaseHelper {
       },
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  // Save workout history
+  Future<void> saveWorkoutHistory({
+    required int duration,
+    required int calories,
+    required int exercises,
+  }) async {
+    final db = await database;
+    await db.insert(
+      'workout_history',
+      {
+        'date': DateTime.now().toIso8601String(),
+        'duration': duration,
+        'calories': calories,
+        'exercises': exercises,
+      },
+    );
+  }
+
+  // Get workout history
+  Future<List<Map<String, dynamic>>> getWorkoutHistory({int daysBack = 30}) async {
+    final db = await database;
+    final cutoffDate = DateTime.now().subtract(Duration(days: daysBack));
+    
+    final results = await db.query(
+      'workout_history',
+      where: 'date > ?',
+      whereArgs: [cutoffDate.toIso8601String()],
+      orderBy: 'date ASC',
+    );
+
+    return results.map((row) => {
+      'date': DateTime.parse(row['date'] as String),
+      'duration': row['duration'] as int,
+      'calories': row['calories'] as int,
+      'exercises': row['exercises'] as int,
+    }).toList();
+  }
+
+  // Add this method if it doesn't exist
+  Future<List<Map<String, dynamic>>> getWorkouts() async {
+    final db = await database;
+    return await db.query('workouts', orderBy: 'date DESC');
+  }
+
+  Future<void> setDailyCalorieGoal(int goal) async {
+    final db = await database;
+    await db.insert(
+      'settings',
+      {'key': 'daily_calorie_goal', 'value': goal.toString()},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updateMealType(int mealId, String newType) async {
+    final db = await database;
+    await db.update(
+      'meals',
+      {'type': newType},
+      where: 'id = ?',
+      whereArgs: [mealId],
+    );
+  }
+
+  Future<void> updateFood(int foodId, String name, int calories) async {
+    final db = await database;
+    await db.update(
+      'foods',
+      {
+        'name': name,
+        'calories': calories,
+      },
+      where: 'id = ?',
+      whereArgs: [foodId],
+    );
+  }
+
+  Future<void> deleteFood(int foodId) async {
+    final db = await database;
+    await db.delete(
+      'foods',
+      where: 'id = ?',
+      whereArgs: [foodId],
     );
   }
 } 

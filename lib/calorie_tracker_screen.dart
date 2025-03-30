@@ -16,7 +16,20 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _initializeAndLoadData();
+  }
+
+  Future<void> _initializeAndLoadData() async {
+    try {
+      // Make sure database is initialized before loading data
+      await DatabaseHelper.instance.database;
+      await _loadData();
+    } catch (e) {
+      print('Error initializing database: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   // Load data from database
@@ -235,17 +248,34 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
               if (typeController.text.isNotEmpty &&
                   nameController.text.isNotEmpty &&
                   caloriesController.text.isNotEmpty) {
-                final mealId = await DatabaseHelper.instance.saveMeal(
-                  typeController.text,
-                  DateTime.now(),
-                );
-                await DatabaseHelper.instance.saveFood(
-                  mealId,
-                  nameController.text,
-                  int.parse(caloriesController.text),
-                );
-                await _loadData();
-                Navigator.pop(context);
+                try {
+                  // Save to database
+                  final mealId = await DatabaseHelper.instance.saveMeal(
+                    typeController.text,
+                    DateTime.now(),
+                  );
+                  await DatabaseHelper.instance.saveFood(
+                    mealId,
+                    nameController.text,
+                    int.parse(caloriesController.text),
+                  );
+                  
+                  // Close dialog first
+                  Navigator.pop(context);
+                  
+                  // Then reload data
+                  await _loadData();
+                  
+                  // Show success message
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Meal added successfully!')),
+                  );
+                } catch (e) {
+                  print('Error saving meal: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error adding meal')),
+                  );
+                }
               }
             },
             child: Text('Add'),
@@ -258,6 +288,9 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
 
   // Show dialog to edit a meal
   void _showEditMealDialog(Map<String, dynamic> meal, int mealIndex) {
+    final typeController = TextEditingController(text: meal['type']);
+    final foods = List<Map<String, dynamic>>.from(meal['foods']);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -265,21 +298,74 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ...meal['foods'].asMap().entries.map<Widget>((entry) {
-              final food = entry.value;
+            TextField(
+              controller: typeController,
+              decoration: InputDecoration(labelText: 'Meal Type'),
+            ),
+            SizedBox(height: 16),
+            Text('Foods:', style: TextStyle(fontWeight: FontWeight.bold)),
+            ...foods.asMap().entries.map((entry) {
               final foodIndex = entry.key;
+              final food = entry.value;
               return ListTile(
                 title: Text(food['name']),
-                trailing: Text('${food['calories']} cal'),
-                onTap: () => _showEditFoodDialog(mealIndex, foodIndex),
+                subtitle: Text('${food['calories']} calories'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.edit),
+                      onPressed: () => _showEditFoodDialog(meal['id'], food, foodIndex),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.delete),
+                      onPressed: () async {
+                        try {
+                          await DatabaseHelper.instance.deleteFood(food['id']);
+                          Navigator.pop(context);
+                          await _loadData();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Food deleted!')),
+                          );
+                        } catch (e) {
+                          print('Error deleting food: $e');
+                        }
+                      },
+                    ),
+                  ],
+                ),
               );
-            }),
+            }).toList(),
+            ElevatedButton(
+              onPressed: () => _showAddFoodDialog(meal['id']),
+              child: Text('Add Food'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+            ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Close'),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await DatabaseHelper.instance.updateMealType(
+                  meal['id'],
+                  typeController.text,
+                );
+                Navigator.pop(context);
+                await _loadData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Meal updated!')),
+                );
+              } catch (e) {
+                print('Error updating meal: $e');
+              }
+            },
+            child: Text('Save'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
           ),
         ],
       ),
@@ -287,13 +373,9 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
   }
 
   // Show dialog to edit a food item
-  void _showEditFoodDialog(int mealIndex, int foodIndex) {
-    final nameController = TextEditingController(
-      text: _meals[mealIndex]['foods'][foodIndex]['name'],
-    );
-    final caloriesController = TextEditingController(
-      text: _meals[mealIndex]['foods'][foodIndex]['calories'].toString(),
-    );
+  void _showEditFoodDialog(int mealId, Map<String, dynamic> food, int foodIndex) {
+    final nameController = TextEditingController(text: food['name']);
+    final caloriesController = TextEditingController(text: food['calories'].toString());
 
     showDialog(
       context: context,
@@ -320,14 +402,129 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (nameController.text.isNotEmpty &&
-                  caloriesController.text.isNotEmpty) {
-                // TODO: Implement food editing in database
-                await _loadData();
+              try {
+                await DatabaseHelper.instance.updateFood(
+                  food['id'],
+                  nameController.text,
+                  int.parse(caloriesController.text),
+                );
                 Navigator.pop(context);
+                await _loadData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Food updated!')),
+                );
+              } catch (e) {
+                print('Error updating food: $e');
               }
             },
             child: Text('Save'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSetGoalDialog() {
+    final goalController = TextEditingController(text: _dailyCalorieGoal.toString());
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Set Daily Calorie Goal'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: goalController,
+              decoration: InputDecoration(labelText: 'Daily Calorie Goal'),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (goalController.text.isNotEmpty) {
+                try {
+                  final newGoal = int.parse(goalController.text);
+                  await DatabaseHelper.instance.setDailyCalorieGoal(newGoal);
+                  Navigator.pop(context);
+                  await _loadData();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Calorie goal updated!')),
+                  );
+                } catch (e) {
+                  print('Error setting goal: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error updating goal')),
+                  );
+                }
+              }
+            },
+            child: Text('Save'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddFoodDialog(int mealId) {
+    final nameController = TextEditingController();
+    final caloriesController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add Food'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(labelText: 'Food Name'),
+            ),
+            TextField(
+              controller: caloriesController,
+              decoration: InputDecoration(labelText: 'Calories'),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isNotEmpty &&
+                  caloriesController.text.isNotEmpty) {
+                try {
+                  await DatabaseHelper.instance.saveFood(
+                    mealId,
+                    nameController.text,
+                    int.parse(caloriesController.text),
+                  );
+                  Navigator.pop(context);
+                  await _loadData();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Food added successfully!')),
+                  );
+                } catch (e) {
+                  print('Error adding food: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error adding food')),
+                  );
+                }
+              }
+            },
+            child: Text('Add'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
           ),
         ],

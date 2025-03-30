@@ -10,7 +10,8 @@ import 'database/database_helper.dart';
 // Main entry point of the application
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await DatabaseHelper.instance.init();
+  // Initialize the database by accessing it
+  await DatabaseHelper.instance.database;
   runApp(MyApp());
 }
 
