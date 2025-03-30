@@ -198,6 +198,18 @@ class DatabaseHelper {
       )
     ''');
 
+    // Add workout logs table if it doesn't exist
+    await db.execute('''
+      CREATE TABLE workout_logs(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        exercise TEXT NOT NULL,
+        sets INTEGER NOT NULL,
+        reps INTEGER NOT NULL,
+        weight REAL,
+        date TEXT NOT NULL
+      )
+    ''');
+
     // Check if default settings exist
     final List<Map<String, dynamic>> settings = await db.query('settings');
     if (settings.isEmpty) {
@@ -511,6 +523,29 @@ class DatabaseHelper {
       'meals',
       where: 'id = ?',
       whereArgs: [mealId],
+    );
+  }
+
+  Future<void> saveWorkoutLog(String exercise, int sets, int reps, double weight, DateTime date) async {
+    final db = await database;
+    await db.insert(
+      'workout_logs',
+      {
+        'exercise': exercise,
+        'sets': sets,
+        'reps': reps,
+        'weight': weight,
+        'date': date.toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getWorkoutLogs() async {
+    final db = await database;
+    return await db.query(
+      'workout_logs',
+      orderBy: 'date DESC',
     );
   }
 } 

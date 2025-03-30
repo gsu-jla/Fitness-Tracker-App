@@ -24,10 +24,10 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
         _isLoading = true;
       });
       
-      final logs = await DatabaseHelper.instance.getWorkouts();
+      final logs = await DatabaseHelper.instance.getWorkoutLogs();
       
       setState(() {
-        _workoutLogs = logs;
+        _workoutLogs = List<Map<String, dynamic>>.from(logs);
         _isLoading = false;
       });
     } catch (e) {
@@ -48,8 +48,20 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
       ),
       body: Column(
         children: [
-          // Quick log section at the top
-          _buildQuickLogSection(),
+          // Quick log buttons section
+          Container(
+            padding: EdgeInsets.all(16),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildQuickLogButton('Push-ups', Icons.fitness_center, Colors.blue),
+                _buildQuickLogButton('Pull-ups', Icons.fitness_center, Colors.green),
+                _buildQuickLogButton('Squats', Icons.fitness_center, Colors.orange),
+                _buildQuickLogButton('Planks', Icons.fitness_center, Colors.red),
+              ],
+            ),
+          ),
           // Scrollable list of logged workouts
           Expanded(
             child: _buildWorkoutLogList(),
@@ -58,48 +70,9 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
       ),
       // Floating action button to add new logs
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddLogDialog,
+        onPressed: () => _showQuickLogDialog(),
         child: Icon(Icons.add),
         backgroundColor: Colors.purple,
-      ),
-    );
-  }
-
-  // Build the quick log section with common workout buttons
-  Widget _buildQuickLogSection() {
-    return Container(
-      padding: EdgeInsets.all(16),
-      color: Colors.purple.withOpacity(0.1),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Quick Log',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 16),
-          // Row of quick log buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildQuickLogButton(
-                'Push-ups',
-                Icons.fitness_center,
-                Colors.blue,
-              ),
-              _buildQuickLogButton(
-                'Pull-ups',
-                Icons.fitness_center,
-                Colors.green,
-              ),
-              _buildQuickLogButton(
-                'Squats',
-                Icons.fitness_center,
-                Colors.orange,
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -107,7 +80,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   // Build a quick log button with custom color
   Widget _buildQuickLogButton(String name, IconData icon, Color color) {
     return ElevatedButton.icon(
-      onPressed: () => _showQuickLogDialog(name),
+      onPressed: () => _showQuickLogDialog(exerciseName: name),
       icon: Icon(icon),
       label: Text(name),
       style: ElevatedButton.styleFrom(
@@ -128,23 +101,25 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
           child: ListTile(
             // Status indicator
             leading: CircleAvatar(
-              backgroundColor: log['completed'] ? Colors.green : Colors.grey,
+              backgroundColor: log['completed'] == true ? Colors.green : Colors.grey,
               child: Icon(
-                log['completed'] ? Icons.check : Icons.pending,
+                log['completed'] == true ? Icons.check : Icons.pending,
                 color: Colors.white,
               ),
             ),
             // Workout details
-            title: Text(log['workoutName']),
+            title: Text(log['workoutName'] ?? log['exercise'] ?? 'Unnamed workout'),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('${log['sets']} sets × ${log['reps']} reps'),
-                Text('Duration: ${log['duration'].inMinutes} minutes'),
-                if (log['notes'] != null) Text('Notes: ${log['notes']}'),
+                if (log['weight'] != null && log['weight'] > 0) 
+                  Text('Weight: ${log['weight']} kg'),
               ],
             ),
-            trailing: Text(_formatDate(log['date'])),
+            trailing: Text(_formatDate(log['date'] is DateTime 
+                ? log['date'] 
+                : DateTime.parse(log['date']))),
             onTap: () => _showEditLogDialog(log, index),
           ),
         );
@@ -153,17 +128,92 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   }
 
   // Show dialog for quick logging a workout
-  void _showQuickLogDialog(String workoutName) {
+  void _showQuickLogDialog({String? exerciseName}) {
+    final exerciseController = TextEditingController(text: exerciseName);
+    final setsController = TextEditingController();
+    final repsController = TextEditingController();
+    final weightController = TextEditingController();
+
     showDialog(
       context: context,
-      builder: (context) => _WorkoutLogDialog(
-        workoutName: workoutName,
-        onSave: (log) {
-          setState(() {
-            _workoutLogs.insert(0, log);
-          });
-          Navigator.pop(context);
-        },
+      builder: (context) => AlertDialog(
+        title: Text('Quick Log: ${exerciseName ?? "Workout"}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (exerciseName == null)
+              TextField(
+                controller: exerciseController,
+                decoration: InputDecoration(labelText: 'Exercise Name'),
+              ),
+            TextField(
+              controller: setsController,
+              decoration: InputDecoration(labelText: 'Sets'),
+              keyboardType: TextInputType.number,
+            ),
+            TextField(
+              controller: repsController,
+              decoration: InputDecoration(labelText: 'Reps'),
+              keyboardType: TextInputType.number,
+            ),
+            TextField(
+              controller: weightController,
+              decoration: InputDecoration(labelText: 'Weight (kg)'),
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                if (exerciseController.text.isEmpty ||
+                    setsController.text.isEmpty ||
+                    repsController.text.isEmpty) {
+                  throw 'Please fill in all required fields';
+                }
+
+                final sets = int.parse(setsController.text);
+                final reps = int.parse(repsController.text);
+                final weight = weightController.text.isNotEmpty 
+                    ? double.parse(weightController.text) 
+                    : 0.0;
+
+                await DatabaseHelper.instance.saveWorkoutLog(
+                  exerciseController.text,
+                  sets,
+                  reps,
+                  weight,
+                  DateTime.now(),
+                );
+
+                Navigator.pop(context);
+                await _loadWorkoutData();
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Workout logged successfully!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                print('Error logging workout: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e is String ? e : 'Error logging workout'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: Text('Save'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+          ),
+        ],
       ),
     );
   }
