@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'database/database_helper.dart';
 
 // Screen for tracking daily calorie intake
 class CalorieTrackerScreen extends StatefulWidget {
@@ -7,65 +8,187 @@ class CalorieTrackerScreen extends StatefulWidget {
 }
 
 class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
-  // Daily calorie goal for the user
-  final int _dailyCalorieGoal = 2000;
-  
-  // List of meals with their items and details
-  final List<Map<String, dynamic>> _meals = [
-    {
-      'name': 'Breakfast',
-      'items': [
-        {
-          'name': 'Oatmeal',
-          'calories': 300,
-          'time': DateTime.now().subtract(Duration(hours: 4)),
-        },
-        {
-          'name': 'Banana',
-          'calories': 105,
-          'time': DateTime.now().subtract(Duration(hours: 4)),
-        },
-      ],
-    },
-    {
-      'name': 'Lunch',
-      'items': [
-        {
-          'name': 'Chicken Salad',
-          'calories': 450,
-          'time': DateTime.now().subtract(Duration(hours: 1)),
-        },
-      ],
-    },
-  ];
+  // Daily calorie goal
+  int _dailyCalorieGoal = 2000; // Default value
+  List<Map<String, dynamic>> _meals = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  // Load data from database
+  Future<void> _loadData() async {
+    try {
+      final goal = await DatabaseHelper.instance.getDailyCalorieGoal();
+      final meals = await DatabaseHelper.instance.getMealsForDate(DateTime.now());
+      setState(() {
+        _dailyCalorieGoal = goal;
+        _meals = meals;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading data: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   // Calculate total calories from all meals
   int get _totalCalories {
-    return _meals.expand((meal) => meal['items']).fold(
-          0,
-          (sum, item) => sum + (item['calories'] as int),
-        );
+    int total = 0;
+    for (var meal in _meals) {
+      for (var food in meal['foods']) {
+        total += food['calories'] as int;
+      }
+    }
+    return total;
+  }
+
+  // Calculate remaining calories
+  int get _remainingCalories {
+    return _dailyCalorieGoal - _totalCalories;
+  }
+
+  // Check if goal is met
+  bool get _isGoalMet {
+    return _totalCalories >= _dailyCalorieGoal;
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Calorie Tracker'),
+          backgroundColor: Colors.purple,
+        ),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
-      // App bar with title and purple theme
       appBar: AppBar(
         title: Text('Calorie Tracker'),
         backgroundColor: Colors.purple,
       ),
       body: Column(
         children: [
-          // Calorie summary section at the top
-          _buildCalorieSummary(),
-          // Scrollable list of meals
+          // Calorie summary section
+          Container(
+            padding: EdgeInsets.all(16),
+            color: Colors.purple.withOpacity(0.1),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Daily Goal: $_dailyCalorieGoal cal',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    Text(
+                      'Total: $_totalCalories cal',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Progress: ${(_totalCalories / _dailyCalorieGoal * 100).toStringAsFixed(2)}%',
+                  style: TextStyle(fontSize: 18),
+                ),
+                SizedBox(height: 8),
+                if (_isGoalMet)
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.emoji_events, color: Colors.green),
+                        SizedBox(width: 8),
+                        Text(
+                          'Congratulations! You\'ve met your goal!',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Text(
+                    'Remaining: $_remainingCalories cal',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: _totalCalories / _dailyCalorieGoal,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    _isGoalMet ? Colors.green : Colors.purple,
+                  ),
+                  minHeight: 10,
+                ),
+              ],
+            ),
+          ),
+          // List of meals
           Expanded(
-            child: _buildMealList(),
+            child: ListView.builder(
+              itemCount: _meals.length,
+              itemBuilder: (context, index) {
+                final meal = _meals[index];
+                return Card(
+                  margin: EdgeInsets.all(8),
+                  child: ExpansionTile(
+                    title: Text(meal['type']),
+                    subtitle: Text(
+                      '${meal['foods'].fold(0, (sum, food) => sum + food['calories'])} calories',
+                    ),
+                    children: [
+                      ...meal['foods'].map<Widget>((food) => ListTile(
+                            title: Text(food['name']),
+                            trailing: Text('${food['calories']} cal'),
+                          )),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () => _showEditMealDialog(meal, index),
+                            icon: Icon(Icons.edit),
+                            label: Text('Edit'),
+                          ),
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _meals.removeAt(index);
+                              });
+                            },
+                            icon: Icon(Icons.delete, color: Colors.red),
+                            label: Text('Delete', style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
-      // Floating action button to add new meals
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddMealDialog,
         child: Icon(Icons.add),
@@ -74,134 +197,108 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
     );
   }
 
-  // Build the calorie summary section with progress bar
-  Widget _buildCalorieSummary() {
-    final progress = _totalCalories / _dailyCalorieGoal;
-    return Container(
-      padding: EdgeInsets.all(16),
-      color: Colors.purple.withOpacity(0.1),
-      child: Column(
-        children: [
-          // Display daily goal and remaining calories
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Daily Goal: $_dailyCalorieGoal',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                'Remaining: ${_dailyCalorieGoal - _totalCalories}',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          SizedBox(height: 16),
-          // Progress bar showing calorie intake
-          LinearProgressIndicator(
-            value: progress,
-            backgroundColor: Colors.grey[200],
-            valueColor: AlwaysStoppedAnimation<Color>(
-              progress >= 1.0 ? Colors.red : Colors.purple,
-            ),
-            minHeight: 10,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Build the list of meals
-  Widget _buildMealList() {
-    return ListView.builder(
-      itemCount: _meals.length,
-      itemBuilder: (context, index) {
-        final meal = _meals[index];
-        // Calculate total calories for this meal
-        final mealCalories = meal['items'].fold(
-          0,
-          (sum, item) => sum + item['calories'],
-        );
-
-        // Create expandable card for each meal
-        return Card(
-          margin: EdgeInsets.all(8),
-          child: ExpansionTile(
-            title: Text(
-              meal['name'],
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text('$mealCalories calories'),
-            children: [
-              // List of food items in this meal
-              ...meal['items'].map<Widget>((item) => ListTile(
-                    title: Text(item['name']),
-                    subtitle: Text('${item['calories']} calories'),
-                    trailing: Text(_formatTime(item['time'])),
-                  )),
-              // Add food button for this meal
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => _showAddFoodDialog(meal),
-                      icon: Icon(Icons.add),
-                      label: Text('Add Food'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   // Show dialog to add a new meal
   void _showAddMealDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add New Meal'),
-        content: TextField(
-          decoration: InputDecoration(
-            labelText: 'Meal Name',
-            hintText: 'e.g., Breakfast, Lunch, Dinner, Snack',
-          ),
-          onSubmitted: (value) {
-            if (value.isNotEmpty) {
-              setState(() {
-                _meals.add({
-                  'name': value,
-                  'items': [],
-                });
-              });
-              Navigator.pop(context);
-            }
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Show dialog to add food to a specific meal
-  void _showAddFoodDialog(Map<String, dynamic> meal) {
+    final typeController = TextEditingController();
     final nameController = TextEditingController();
     final caloriesController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Add Food to ${meal['name']}'),
+        title: Text('Add New Meal'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: typeController,
+              decoration: InputDecoration(labelText: 'Meal Type (e.g., Breakfast)'),
+            ),
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(labelText: 'Food Name'),
+            ),
+            TextField(
+              controller: caloriesController,
+              decoration: InputDecoration(labelText: 'Calories'),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (typeController.text.isNotEmpty &&
+                  nameController.text.isNotEmpty &&
+                  caloriesController.text.isNotEmpty) {
+                final mealId = await DatabaseHelper.instance.saveMeal(
+                  typeController.text,
+                  DateTime.now(),
+                );
+                await DatabaseHelper.instance.saveFood(
+                  mealId,
+                  nameController.text,
+                  int.parse(caloriesController.text),
+                );
+                await _loadData();
+                Navigator.pop(context);
+              }
+            },
+            child: Text('Add'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Show dialog to edit a meal
+  void _showEditMealDialog(Map<String, dynamic> meal, int mealIndex) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit ${meal['type']}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ...meal['foods'].asMap().entries.map<Widget>((entry) {
+              final food = entry.value;
+              final foodIndex = entry.key;
+              return ListTile(
+                title: Text(food['name']),
+                trailing: Text('${food['calories']} cal'),
+                onTap: () => _showEditFoodDialog(mealIndex, foodIndex),
+              );
+            }),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Show dialog to edit a food item
+  void _showEditFoodDialog(int mealIndex, int foodIndex) {
+    final nameController = TextEditingController(
+      text: _meals[mealIndex]['foods'][foodIndex]['name'],
+    );
+    final caloriesController = TextEditingController(
+      text: _meals[mealIndex]['foods'][foodIndex]['calories'].toString(),
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit Food'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -222,29 +319,19 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
             child: Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (nameController.text.isNotEmpty &&
                   caloriesController.text.isNotEmpty) {
-                setState(() {
-                  meal['items'].add({
-                    'name': nameController.text,
-                    'calories': int.parse(caloriesController.text),
-                    'time': DateTime.now(),
-                  });
-                });
+                // TODO: Implement food editing in database
+                await _loadData();
                 Navigator.pop(context);
               }
             },
-            child: Text('Add'),
+            child: Text('Save'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
           ),
         ],
       ),
     );
   }
-
-  // Format time to HH:MM format
-  String _formatTime(DateTime time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-  }
-} 
+}

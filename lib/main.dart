@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import 'workout_screen.dart';
 import 'workout_log_screen.dart';
 import 'calorie_tracker_screen.dart';
+import 'progress_tracker_screen.dart';
+import 'preset_routines_screen.dart';
+import 'database/database_helper.dart';
 
 // Main entry point of the application
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await DatabaseHelper.instance.init();
   runApp(MyApp());
 }
 
@@ -76,6 +81,11 @@ class HomePage extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => CalorieTrackerScreen()),
+            );
+          } else if (title == 'Progress Tracker') {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ProgressTrackerScreen()),
             );
           }
         },
