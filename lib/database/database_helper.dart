@@ -497,4 +497,20 @@ class DatabaseHelper {
       whereArgs: [foodId],
     );
   }
+
+  Future<void> deleteMeal(int mealId) async {
+    final db = await database;
+    // First delete all foods associated with this meal
+    await db.delete(
+      'foods',
+      where: 'meal_id = ?',
+      whereArgs: [mealId],
+    );
+    // Then delete the meal itself
+    await db.delete(
+      'meals',
+      where: 'id = ?',
+      whereArgs: [mealId],
+    );
+  }
 } 

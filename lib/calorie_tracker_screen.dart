@@ -89,6 +89,12 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
       appBar: AppBar(
         title: Text('Calorie Tracker'),
         backgroundColor: Colors.purple,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.settings),
+            onPressed: _showCalorieGoalDialog,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -184,10 +190,19 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
                             label: Text('Edit'),
                           ),
                           TextButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                _meals.removeAt(index);
-                              });
+                            onPressed: () async {
+                              try {
+                                await DatabaseHelper.instance.deleteMeal(meal['id']);
+                                await _loadData(); // Reload data from database
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Meal deleted successfully')),
+                                );
+                              } catch (e) {
+                                print('Error deleting meal: $e');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error deleting meal')),
+                                );
+                              }
                             },
                             icon: Icon(Icons.delete, color: Colors.red),
                             label: Text('Delete', style: TextStyle(color: Colors.red)),
@@ -425,7 +440,7 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
     );
   }
 
-  void _showSetGoalDialog() {
+  void _showCalorieGoalDialog() {
     final goalController = TextEditingController(text: _dailyCalorieGoal.toString());
 
     showDialog(
@@ -437,8 +452,29 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
           children: [
             TextField(
               controller: goalController,
-              decoration: InputDecoration(labelText: 'Daily Calorie Goal'),
+              decoration: InputDecoration(
+                labelText: 'Daily Calorie Goal',
+                hintText: 'Enter your daily calorie goal',
+                suffixText: 'calories',
+              ),
               keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              children: [1500, 2000, 2500].map((preset) {
+                return ActionChip(
+                  label: Text('$preset cal'),
+                  onPressed: () {
+                    goalController.text = preset.toString();
+                  },
+                );
+              }).toList(),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Current goal: $_dailyCalorieGoal calories',
+              style: TextStyle(color: Colors.grey),
             ),
           ],
         ),
@@ -452,16 +488,31 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
               if (goalController.text.isNotEmpty) {
                 try {
                   final newGoal = int.parse(goalController.text);
-                  await DatabaseHelper.instance.setDailyCalorieGoal(newGoal);
-                  Navigator.pop(context);
-                  await _loadData();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Calorie goal updated!')),
-                  );
+                  if (newGoal > 0) {
+                    await DatabaseHelper.instance.saveDailyCalorieGoal(newGoal);
+                    Navigator.pop(context);
+                    await _loadData();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Daily calorie goal updated to $newGoal calories'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Please enter a positive number'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 } catch (e) {
-                  print('Error setting goal: $e');
+                  print('Error updating calorie goal: $e');
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error updating goal')),
+                    SnackBar(
+                      content: Text('Please enter a valid number'),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               }
