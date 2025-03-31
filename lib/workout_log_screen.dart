@@ -189,8 +189,8 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
                   reps: reps,
                   weight: weight,
                   date: DateTime.now(),
-                  duration: 0, // Add default duration for manual logs
-                  calories: 0, // Add default calories for manual logs
+                  duration: 0,
+                  calories: 0,
                 );
 
                 Navigator.pop(context);
@@ -203,10 +203,9 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
                   ),
                 );
               } catch (e) {
-                print('Error logging workout: $e');
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(e is String ? e : 'Error logging workout'),
+                    content: Text('Error logging workout'),
                     backgroundColor: Colors.red,
                   ),
                 );

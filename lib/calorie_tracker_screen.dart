@@ -21,14 +21,13 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
 
   Future<void> _initializeAndLoadData() async {
     try {
-      // Make sure database is initialized before loading data
       await DatabaseHelper.instance.database;
       await _loadData();
     } catch (e) {
-      print('Error initializing database: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error initializing database')),
+      );
     }
   }
 
@@ -43,10 +42,10 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading data: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading data')),
+      );
     }
   }
 

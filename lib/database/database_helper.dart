@@ -20,7 +20,6 @@ class DatabaseHelper {
 
   // Initialize the database with required tables
   Future<Database> _initDB(String filePath) async {
-    // Get the correct path for the database
     final documentsPath = Directory.current.path;
     final dbPath = join(documentsPath, '.dart_tool', 'sqflite_common_ffi', 'databases');
     final path = join(dbPath, filePath);
@@ -28,68 +27,108 @@ class DatabaseHelper {
     // Ensure the directory exists
     await Directory(dbPath).create(recursive: true);
 
-    print('Opening database at: $path'); // Debug print
+    // Delete existing database to force recreation
+    try {
+      await File(path).delete();
+      print('Deleted existing database');
+    } catch (e) {
+      print('No existing database to delete');
+    }
+
+    print('Creating new database at: $path');
 
     return await openDatabase(
       path,
-      version: 3, // Increment from 2 to 3
+      version: 4, // Increment version number
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
   }
 
   Future _createDB(Database db, int version) async {
-    // Create tables with all required columns
+    print('Creating new database with version $version');
+    
+    // Create workouts table
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS workout_logs (
+      CREATE TABLE workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        exercise TEXT,
-        sets INTEGER,
-        reps INTEGER,
-        weight REAL,
-        date TEXT,
-        duration INTEGER DEFAULT 0,
-        calories INTEGER DEFAULT 0,
-        completed BOOLEAN DEFAULT 0
+        name TEXT NOT NULL,
+        level TEXT NOT NULL,
+        exercises TEXT NOT NULL,
+        date TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Not Started',
+        completed_at TEXT
       )
     ''');
 
+    // Create workout_logs table
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS settings (
+      CREATE TABLE workout_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        exercise TEXT NOT NULL,
+        sets INTEGER NOT NULL,
+        reps INTEGER NOT NULL,
+        weight REAL NOT NULL,
+        date TEXT NOT NULL,
+        duration INTEGER NOT NULL,
+        calories INTEGER NOT NULL
+      )
+    ''');
+
+    // Create weight_history table
+    await db.execute('''
+      CREATE TABLE weight_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        weight REAL NOT NULL,
+        date TEXT NOT NULL
+      )
+    ''');
+
+    // Create settings table
+    await db.execute('''
+      CREATE TABLE settings (
         key TEXT PRIMARY KEY,
-        value TEXT
+        value TEXT NOT NULL
       )
     ''');
 
+    // Insert default weight unit setting
+    await db.insert('settings', {
+      'key': 'weight_unit',
+      'value': 'lbs'
+    });
+
+    // Add meals table
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS weight_history (
+      CREATE TABLE meals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        weight REAL,
-        date TEXT
+        type TEXT NOT NULL,
+        date TEXT NOT NULL
       )
     ''');
 
-    // Insert default settings if they don't exist
-    await db.insert(
-      'settings',
-      {'key': 'weight_unit', 'value': 'lbs'},
-      conflictAlgorithm: ConflictAlgorithm.replace
-    );
-
-    await db.insert(
-      'settings',
-      {'key': 'user_weight', 'value': '70.0'},
-      conflictAlgorithm: ConflictAlgorithm.replace
-    );
+    // Add foods table
+    await db.execute('''
+      CREATE TABLE foods (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        meal_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        calories INTEGER NOT NULL,
+        FOREIGN KEY (meal_id) REFERENCES meals (id)
+      )
+    ''');
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
     print('Upgrading database from $oldVersion to $newVersion');
     if (oldVersion < newVersion) {
-      // Drop the existing table
+      // Drop existing tables
       await db.execute('DROP TABLE IF EXISTS workout_logs');
+      await db.execute('DROP TABLE IF EXISTS workouts');
+      await db.execute('DROP TABLE IF EXISTS meals');
+      await db.execute('DROP TABLE IF EXISTS foods');
       
-      // Recreate the table with correct schema
+      // Recreate workout_logs table
       await db.execute('''
         CREATE TABLE workout_logs (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,6 +140,39 @@ class DatabaseHelper {
           duration INTEGER DEFAULT 0,
           calories INTEGER DEFAULT 0,
           completed BOOLEAN DEFAULT 0
+        )
+      ''');
+
+      // Recreate workouts table
+      await db.execute('''
+        CREATE TABLE workouts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          level TEXT NOT NULL,
+          exercises TEXT NOT NULL,
+          date TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'Not Started',
+          completed_at TEXT
+        )
+      ''');
+
+      // Recreate meals table
+      await db.execute('''
+        CREATE TABLE meals (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          type TEXT NOT NULL,
+          date TEXT NOT NULL
+        )
+      ''');
+
+      // Recreate foods table
+      await db.execute('''
+        CREATE TABLE foods (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          meal_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          calories INTEGER NOT NULL,
+          FOREIGN KEY (meal_id) REFERENCES meals (id)
         )
       ''');
     }
@@ -276,27 +348,30 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     
-    // Save the workout
-    final workoutId = await db.insert('workouts', {
-      'name': name,
-      'level': level,
-      'date': DateTime.now().toIso8601String(),
-      'status': 'In Progress',
-    });
+    try {
+      // Convert exercises list to JSON string for storage
+      final exercisesJson = exercises.toString();
+      
+      final workoutData = {
+        'name': name,
+        'level': level,
+        'exercises': exercisesJson,
+        'date': DateTime.now().toIso8601String(),
+        'status': 'Not Started',
+      };
 
-    // Save exercises
-    for (var exercise in exercises) {
-      await db.insert('exercises', {
-        'workout_id': workoutId,
-        'name': exercise['name'],
-        'sets': exercise['sets'],
-        'reps': exercise['reps'] ?? '',
-        'duration': exercise['duration'] ?? '',
-        'rest': exercise['rest'],
-      });
+      final id = await db.insert(
+        'workouts',
+        workoutData,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      print('Saved workout with ID: $id'); // Debug print
+      return id;
+    } catch (e) {
+      print('Error saving workout: $e');
+      throw e;
     }
-
-    return workoutId;
   }
 
   // Get workouts for a specific date
@@ -390,6 +465,7 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+    
     if (maps.isEmpty) {
       throw Exception('Workout not found');
     }

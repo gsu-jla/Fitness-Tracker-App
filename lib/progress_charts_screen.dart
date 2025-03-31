@@ -12,8 +12,8 @@ class ProgressChartsScreen extends StatefulWidget {
 
 class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
   // State variables to store workout and weight data
-  List<Map<String, dynamic>> _workoutHistory = [];
   List<Map<String, dynamic>> _weightHistory = [];
+  List<Map<String, dynamic>> _workoutHistory = [];
   bool _isLoading = true;
   String _weightUnit = 'lbs';
 
@@ -103,7 +103,6 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
       return Center(child: Text('No weight data available'));
     }
 
-    // Sort weight data by date
     final sortedWeights = List<Map<String, dynamic>>.from(_weightHistory);
     sortedWeights.sort((a, b) {
       final dateA = DateTime.parse(a['date'] as String);
@@ -125,10 +124,10 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
     double padding = (maxWeight - minWeight) * 0.2;
     double yMin = ((minWeight - padding) / 5).floor() * 5.0;
     double yMax = ((maxWeight + padding) / 5).ceil() * 5.0;
+
+    // Ensure non-zero intervals
     double yInterval = ((yMax - yMin) / 6).ceil().toDouble();
-    if (yInterval > 5) {
-      yInterval = (yInterval / 5).ceil() * 5.0;
-    }
+    yInterval = math.max(yInterval, 1.0); // Ensure minimum interval of 1
 
     // Calculate x-axis range and intervals
     final firstDate = DateTime.parse(sortedWeights.first['date'] as String);
@@ -136,7 +135,8 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
     final totalDays = lastDate.difference(firstDate).inDays;
     final startDate = firstDate.subtract(Duration(days: 2));
     final endDate = lastDate.add(Duration(days: 2));
-    final xInterval = 86400000 * math.max((totalDays / 5).ceil(), 1).toDouble();
+    double xInterval = 86400000 * math.max((totalDays / 5).ceil(), 1).toDouble();
+    xInterval = math.max(xInterval, 86400000.0); // Ensure minimum interval of 1 day
 
     // Build the scrollable chart container
     return SingleChildScrollView(
@@ -225,86 +225,6 @@ class _ProgressChartsScreenState extends State<ProgressChartsScreen> {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWorkoutDurationChart() {
-    if (_workoutHistory.isEmpty) {
-      return Center(child: Text('No workout data available'));
-    }
-
-    final sortedWorkouts = List<Map<String, dynamic>>.from(_workoutHistory);
-    sortedWorkouts.sort((a, b) {
-      final dateA = DateTime.parse(a['date'] as String);
-      final dateB = DateTime.parse(b['date'] as String);
-      return dateA.compareTo(dateB);
-    });
-
-    final spots = sortedWorkouts.map((workout) {
-      final date = DateTime.parse(workout['date'] as String);
-      final duration = (workout['duration'] as int?) ?? 0;
-      return FlSpot(date.millisecondsSinceEpoch.toDouble(), duration.toDouble());
-    }).toList();
-
-    return Container(
-      height: 250,
-      padding: EdgeInsets.fromLTRB(16, 16, 32, 16),
-      child: LineChart(
-        LineChartData(
-          minY: 0,
-          maxY: 120, // 2 hours max
-          gridData: FlGridData(
-            show: true,
-            horizontalInterval: 30,
-            verticalInterval: 86400000,
-          ),
-          titlesData: FlTitlesData(
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: 86400000,
-                reservedSize: 30,
-                getTitlesWidget: (value, meta) {
-                  final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                  return Transform.rotate(
-                    angle: -0.5,
-                    child: Text(
-                      '${date.day}/${date.month}',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  );
-                },
-              ),
-            ),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 45,
-                interval: 30,
-                getTitlesWidget: (value, meta) {
-                  return Padding(
-                    padding: EdgeInsets.only(right: 8),
-                    child: Text(
-                      '${value.toInt()} min',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  );
-                },
-              ),
-            ),
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-          lineBarsData: [
-            LineChartBarData(
-              spots: spots,
-              isCurved: true,
-              color: Colors.blue,
-              dotData: FlDotData(show: true),
-            ),
-          ],
         ),
       ),
     );
