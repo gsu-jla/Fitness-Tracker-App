@@ -278,39 +278,31 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
 // Dialog for adding or editing workout logs
 class _WorkoutLogDialog extends StatefulWidget {
   final Map<String, dynamic>? log;
-  final String? workoutName;
   final Function(Map<String, dynamic>) onSave;
 
-  const _WorkoutLogDialog({
-    Key? key,
-    this.log,
-    this.workoutName,
-    required this.onSave,
-  }) : super(key: key);
+  _WorkoutLogDialog({this.log, required this.onSave});
 
   @override
   _WorkoutLogDialogState createState() => _WorkoutLogDialogState();
 }
 
 class _WorkoutLogDialogState extends State<_WorkoutLogDialog> {
-  // Controllers for form fields
-  late TextEditingController _nameController;
-  late TextEditingController _setsController;
-  late TextEditingController _repsController;
-  late TextEditingController _notesController;
-  late Duration _duration;
-  late bool _completed;
+  final exerciseController = TextEditingController();
+  final setsController = TextEditingController();
+  final repsController = TextEditingController();
+  final weightController = TextEditingController();
+  final durationController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // Initialize controllers with existing log data or defaults
-    _nameController = TextEditingController(text: widget.log?['workoutName'] ?? widget.workoutName ?? '');
-    _setsController = TextEditingController(text: widget.log?['sets']?.toString() ?? '');
-    _repsController = TextEditingController(text: widget.log?['reps']?.toString() ?? '');
-    _notesController = TextEditingController(text: widget.log?['notes'] ?? '');
-    _duration = widget.log?['duration'] ?? Duration(minutes: 15);
-    _completed = widget.log?['completed'] ?? true;
+    if (widget.log != null) {
+      exerciseController.text = widget.log!['exercise'].toString();
+      setsController.text = widget.log!['sets'].toString();
+      repsController.text = widget.log!['reps'].toString();
+      weightController.text = widget.log!['weight'].toString();
+      durationController.text = widget.log!['duration'].toString();
+    }
   }
 
   @override
@@ -323,62 +315,40 @@ class _WorkoutLogDialogState extends State<_WorkoutLogDialog> {
           children: [
             // Form fields for workout details
             TextField(
-              controller: _nameController,
-              decoration: InputDecoration(labelText: 'Workout Name'),
+              controller: exerciseController,
+              decoration: InputDecoration(labelText: 'Exercise Name'),
             ),
             TextField(
-              controller: _setsController,
+              controller: setsController,
               decoration: InputDecoration(labelText: 'Number of Sets'),
               keyboardType: TextInputType.number,
             ),
             TextField(
-              controller: _repsController,
+              controller: repsController,
               decoration: InputDecoration(labelText: 'Number of Reps'),
               keyboardType: TextInputType.number,
             ),
             TextField(
-              controller: _notesController,
-              decoration: InputDecoration(labelText: 'Notes'),
-              maxLines: 3,
+              controller: weightController,
+              decoration: InputDecoration(labelText: 'Weight (kg)'),
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
+            ),
+            TextField(
+              controller: durationController,
+              decoration: InputDecoration(labelText: 'Duration (minutes)'),
+              keyboardType: TextInputType.number,
             ),
             SizedBox(height: 16),
-            // Duration dropdown
-            Row(
-              children: [
-                Text('Duration: '),
-                DropdownButton<Duration>(
-                  value: _duration,
-                  items: [
-                    Duration(minutes: 5),
-                    Duration(minutes: 10),
-                    Duration(minutes: 15),
-                    Duration(minutes: 20),
-                    Duration(minutes: 30),
-                    Duration(minutes: 45),
-                    Duration(minutes: 60),
-                  ].map((Duration duration) {
-                    return DropdownMenuItem<Duration>(
-                      value: duration,
-                      child: Text('${duration.inMinutes} minutes'),
-                    );
-                  }).toList(),
-                  onChanged: (Duration? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        _duration = newValue;
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
             // Completion status toggle
             SwitchListTile(
               title: Text('Completed'),
-              value: _completed,
+              value: widget.log?['completed'] ?? true,
               onChanged: (bool value) {
                 setState(() {
-                  _completed = value;
+                  widget.onSave({
+                    ...(widget.log ?? {}),
+                    'completed': value,
+                  });
                 });
               },
             ),
@@ -395,12 +365,12 @@ class _WorkoutLogDialogState extends State<_WorkoutLogDialog> {
           onPressed: () {
             final log = {
               'date': DateTime.now(),
-              'workoutName': _nameController.text,
-              'sets': int.tryParse(_setsController.text) ?? 3,
-              'reps': int.tryParse(_repsController.text) ?? 12,
-              'duration': _duration,
-              'notes': _notesController.text,
-              'completed': _completed,
+              'exercise': exerciseController.text,
+              'sets': int.tryParse(setsController.text) ?? 3,
+              'reps': int.tryParse(repsController.text) ?? 12,
+              'weight': double.tryParse(weightController.text) ?? 0.0,
+              'duration': Duration(minutes: int.tryParse(durationController.text) ?? 15),
+              'completed': widget.log?['completed'] ?? true,
             };
             widget.onSave(log);
           },

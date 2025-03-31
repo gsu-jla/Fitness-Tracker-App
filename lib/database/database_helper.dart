@@ -460,16 +460,21 @@ class DatabaseHelper {
   // Get a specific workout by ID
   Future<Map<String, dynamic>> getWorkout(int id) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
+    final results = await db.query(
       'workouts',
       where: 'id = ?',
       whereArgs: [id],
     );
     
-    if (maps.isEmpty) {
+    if (results.isEmpty) {
       throw Exception('Workout not found');
     }
-    return maps.first;
+
+    final workout = results.first;
+    return {
+      ...workout,
+      'exercises': workout['exercises'], // This is already a JSON string
+    };
   }
 
   // Update workout status
