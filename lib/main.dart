@@ -13,24 +13,21 @@ import 'dart:io';
 // Main entry point of the application
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize sqflite_common_ffi
-  sqfliteFfiInit();
-  databaseFactory = databaseFactoryFfi;
 
-  // Delete existing database to apply schema changes
-  final dbPath = join(Directory.current.path, '.dart_tool/sqflite_common_ffi/databases/fitness_tracker.db');
-  try {
-    await File(dbPath).delete();
-    print('Deleted existing database');
-  } catch (e) {
-    print('No existing database to delete');
+  // Only use sqflite_ffi for desktop platforms
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
   }
 
-  // Initialize database with new schema
-  await DatabaseHelper.instance.database;
-
-  runApp(FitnessTrackerApp());
+  try {
+    // Initialize database with new schema
+    await DatabaseHelper.instance.database;
+    runApp(FitnessTrackerApp());
+  } catch (e) {
+    print('Error initializing database: $e');
+    runApp(FitnessTrackerApp());
+  }
 }
 
 // Root widget of the application
