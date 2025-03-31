@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:io';
+import 'package:path_provider/path_provider.dart' as path_provider;
 
 // Database helper class to manage all SQLite operations
 class DatabaseHelper {
@@ -20,20 +21,9 @@ class DatabaseHelper {
 
   // Initialize the database with required tables
   Future<Database> _initDB(String filePath) async {
-    final documentsPath = Directory.current.path;
-    final dbPath = join(documentsPath, '.dart_tool', 'sqflite_common_ffi', 'databases');
-    final path = join(dbPath, filePath);
-
-    // Ensure the directory exists
-    await Directory(dbPath).create(recursive: true);
-
-    // Delete existing database to force recreation
-    try {
-      await File(path).delete();
-      print('Deleted existing database');
-    } catch (e) {
-      print('No existing database to delete');
-    }
+    // Get the application documents directory
+    final dbPath = await path_provider.getApplicationDocumentsDirectory();
+    final path = join(dbPath.path, filePath);
 
     print('Creating new database at: $path');
 
