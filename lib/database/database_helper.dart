@@ -27,12 +27,9 @@ class DatabaseHelper {
 
     print('Creating new database at: $path');
 
-    // Make sure the directory exists
-    await Directory(dbPath.path).create(recursive: true);
-
     return await openDatabase(
       path,
-      version: 4, // Increment version number
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
